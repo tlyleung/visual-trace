@@ -7,7 +7,9 @@ authors = [
     { name = "Timothy Leung", email = "timothyleung@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "manim>=0.19.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]
