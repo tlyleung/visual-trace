@@ -135,11 +135,14 @@ class Animated:
             self.mobject.placeholder.set_stroke(opacity=0.0)
 
     def _place_cell(self, cell: mn.Mobject) -> None:
-        """Position a new cell against what is already drawn.
+        """Position a new cell in the next slot of the row.
 
         Cells are built at the world origin, so one created after the table has
-        moved the container must anchor to something on screen: the last drawn
-        cell, or the placeholder when there is none yet.
+        moved the container must anchor to something on screen. The placeholder
+        is the right anchor: it marks slot zero, it moves with the container, and
+        unlike the previous cell it is never mid-animation. Anchoring to
+        ``items[-1]`` instead reads a position that a queued removal is about to
+        shift, leaving a cell-width hole in the row.
         """
         if len(self.mobject.items):
             cell.next_to(self.mobject.items[-1], mn.RIGHT, buff=0)

@@ -119,36 +119,40 @@ def trace_func(
     scene: mn.Scene,
     variables: dict[str, Any],
 ) -> Callable:
+    # Decline to trace anything but the target function. Returning a local
+    # tracer here would line-trace every nested frame -- all of Manim's mobject
+    # construction inside an overridden method -- only to discard the events
+    # below, which measured ~8x slower.
+    if frame is not None and frame.f_code.co_name != func.__name__:
+        return None
+
     if event == "line":
-        code = frame.f_code
         lineno = frame.f_lineno - scene.start_line_number  # adjust for function offset
 
-        function_name = code.co_name
-        if function_name == func.__name__:
-            # First pass: save variables
-            for variable, value in frame.f_locals.items():
-                variables[variable] = type(value)
+        # First pass: save variables
+        for variable, value in frame.f_locals.items():
+            variables[variable] = type(value)
 
-            # Kept so the run can be flushed once the function has returned.
-            scene.last_locals = dict(frame.f_locals)
-            scene.last_lineno = lineno
-            scene.last_abs_lineno = frame.f_lineno
+        # Kept so the run can be flushed once the function has returned.
+        scene.last_locals = dict(frame.f_locals)
+        scene.last_lineno = lineno
+        scene.last_abs_lineno = frame.f_lineno
 
-            # Second pass only: the first just collects variable names.
-            #
-            # The trace fires *before* a line runs, so a line's animations only
-            # reach us at the next event. `_settle` draws them while the
-            # highlight is still on the line that caused them, and only then
-            # advances it -- moving and drawing together would credit the effect
-            # to the following line.
-            if scene.trace_pass == ANIMATING_PASS:
-                _settle(
-                    scene,
-                    lineno,
-                    frame.f_lineno,
-                    frame.f_locals,
-                    advance_highlight=True,
-                )
+        # Second pass only: the first just collects variable names.
+        #
+        # The trace fires *before* a line runs, so a line's animations only
+        # reach us at the next event. `_settle` draws them while the
+        # highlight is still on the line that caused them, and only then
+        # advances it -- moving and drawing together would credit the effect
+        # to the following line.
+        if scene.trace_pass == ANIMATING_PASS:
+            _settle(
+                scene,
+                lineno,
+                frame.f_lineno,
+                frame.f_locals,
+                advance_highlight=True,
+            )
 
     return lambda *args, **kwargs: trace_func(
         *args, **kwargs, func=func, scene=scene, variables=variables

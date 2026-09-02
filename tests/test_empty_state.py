@@ -5,6 +5,8 @@ logic: two_sum's first `target - num in d` searches an empty dict, so the miss
 that sets up the whole algorithm drew nothing at all.
 """
 
+import pytest
+
 from stubs import drain, render_step, settle, visible_size
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
@@ -157,3 +159,30 @@ def test_a_three_row_placeholder_stacks_without_overlapping():
     gaps = [round(centres[i] - centres[i + 1], 3) for i in range(len(centres) - 1)]
     assert gaps == [0.5, 0.5], f"squares are not stacked contiguously: {gaps}"
     assert centres[-1] == 0.0, "the bottom square should sit on the origin"
+
+
+@pytest.mark.xfail(
+    reason="known gap: a removal's left-shift of the survivors is a deferred "
+    "animation, so a cell inserted before the next settle anchors to geometry "
+    "that has not moved yet. Placing cells at an exact multiple of CELL_SIZE "
+    "instead would fix it, but assumes no cell is ever wider than its square. "
+    "Unreachable today -- no example deletes and inserts between settles.",
+    strict=True,
+)
+def test_a_cell_added_after_a_removal_lands_in_the_freed_slot():
+    """Removals shift the survivors, and that shift is deferred.
+
+    Anchoring a new cell to the previous cell's *current* position therefore
+    reads geometry that is about to move, leaving a cell-width hole in the row.
+    """
+    d = Dict(a=1, b=2, c=3)
+    drain(d)
+    settle(d)
+    del d["a"]
+    d["z"] = 9
+    drain(d)
+    settle(d)
+
+    centres = [round(float(cell.get_center()[0]), 3) for cell in d.mobject.items]
+    gaps = [round(centres[i + 1] - centres[i], 3) for i in range(len(centres) - 1)]
+    assert gaps == [0.5, 0.5], f"row is not contiguous after a removal: {gaps}"

@@ -261,9 +261,9 @@ def within_frame(scene, lineno, local_vars) -> list[dict]:
     half_h = mn.config.frame_height / 2
     checks = []
     targets = {"code": scene.code, "highlight": scene.highlight, "table": scene.table}
-    for name, value in _tracked(local_vars, list):
+    for name, value in _tracked(local_vars):
         if len(value.mobject.items):
-            targets[f"list:{name}"] = value.mobject
+            targets[f"struct:{name}"] = value.mobject
     for name, m in targets.items():
         horizontal = visible_range(m, axis=0)
         vertical = visible_range(m, axis=1)
@@ -291,15 +291,15 @@ def within_frame(scene, lineno, local_vars) -> list[dict]:
     return checks
 
 
-def list_square_count(scene, lineno, local_vars) -> list[dict]:
+def cell_count_matches(scene, lineno, local_vars) -> list[dict]:
     """One drawn cell per element, once ``pending_operations`` have drained."""
     checks = []
-    for name, value in _tracked(local_vars, list):
+    for name, value in _tracked(local_vars):
         drawn = len(value.mobject.items)
         ok = drawn == len(value)
         checks.append(
             _check(
-                "list_square_count",
+                "cell_count_matches",
                 ok,
                 f"{name}: {drawn} drawn vs {len(value)} elements",
             )
@@ -307,10 +307,10 @@ def list_square_count(scene, lineno, local_vars) -> list[dict]:
     return checks
 
 
-def list_squares_contiguous(scene, lineno, local_vars) -> list[dict]:
+def cells_contiguous(scene, lineno, local_vars) -> list[dict]:
     """Adjacent cells should touch; a growing gap means positioning is wrong."""
     checks = []
-    for name, value in _tracked(local_vars, list):
+    for name, value in _tracked(local_vars):
         items = list(value.mobject.items)
         if len(items) < 2:
             continue
@@ -321,7 +321,7 @@ def list_squares_contiguous(scene, lineno, local_vars) -> list[dict]:
         ok = abs(worst) <= TOL
         checks.append(
             _check(
-                "list_squares_contiguous",
+                "cells_contiguous",
                 ok,
                 f"{name}: gaps={[round(g, 3) for g in gaps]} worst={worst:.3f}",
             )
@@ -363,8 +363,8 @@ INVARIANTS = [
     highlight_spans_code_width,
     panels_disjoint,
     within_frame,
-    list_square_count,
-    list_squares_contiguous,
+    cell_count_matches,
+    cells_contiguous,
     table_rows_disjoint,
     table_row_count,
 ]

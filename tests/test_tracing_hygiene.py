@@ -46,3 +46,24 @@ def test_variables_records_the_type_of_the_value():
 
     _, variables = start_tracing(Bare(), has_locals)
     assert variables == {"count": int, "label": str}
+
+
+def test_frames_outside_the_traced_function_are_not_line_traced():
+    """Line-tracing everything the traced code calls is ~8x slower.
+
+    Every nested frame -- all of Manim's mobject construction inside an
+    overridden method -- was line-traced only for its events to be discarded by
+    the name check.
+    """
+    import sys as _sys
+
+    from visual_trace.utils.tracing import trace_func
+
+    def traced():
+        pass
+
+    def somewhere_else():
+        return _sys._getframe()
+
+    handler = trace_func(None, None, None, traced, Bare(), {})
+    assert handler(somewhere_else(), "call", None) is None
