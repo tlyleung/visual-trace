@@ -58,6 +58,10 @@ event. The tracer therefore draws the previous line's effects while the highligh
 is still on that line, and only then advances the highlight. Doing both in one
 `play` credits the effect to the wrong line.
 
+Because harvesting happens one event late, the final line has nobody to collect
+its animations; `tracing.flush` draws them after the run and records itself as a
+step so the frame reaches the contact sheet.
+
 ## Verifying changes
 
 An agent cannot watch an MP4, so `scripts/verify.py` turns a render into things

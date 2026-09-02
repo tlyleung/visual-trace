@@ -35,9 +35,29 @@ class List(Animated, list):
         )
         self.pending_operations.append(lambda: self.mobject.add(cell))
 
+    def __highlight_animation(self, index: int) -> list:
+        if index < 0:
+            index += len(self.mobject)
+        if not 0 <= index < len(self.mobject):
+            return []
+        square, _ = self.mobject[index]
+        square.set_fill(mn.WHITE, opacity=0.5)
+        return [square.animate.set_fill(mn.WHITE, opacity=0.0)]
+
     #
     # List methods
     #
+
+    def __getitem__(self, index):
+        """Light the cell being read.
+
+        Only for a single index: a slice reads every cell, and lighting them all
+        would be noise rather than a signal about what the algorithm looked at.
+        """
+        value = list.__getitem__(self, index)
+        if isinstance(index, int):
+            self.animation_queue.extend(self.__highlight_animation(index))
+        return value
 
     def append(self, value: object) -> None:
         """Animate adding a new square and label."""

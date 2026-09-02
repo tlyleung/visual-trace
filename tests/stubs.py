@@ -87,3 +87,15 @@ def assert_in_row(value, label, name: str) -> None:
         f"{name} starts at x={value_left:.3f}, left of its label's "
         f"right edge at x={label_right:.3f}"
     )
+
+
+def settle(structure) -> None:
+    """Play the queued animations to their end state, as a render would."""
+    from manim.animation.animation import prepare_animation
+
+    for queued in structure.animation_queue:
+        animation = prepare_animation(queued)
+        animation.begin()
+        animation.interpolate(1)
+        animation.finish()
+    structure.animation_queue.clear()

@@ -79,6 +79,26 @@ class Dict(Animated, dict):
             mn.Transform(val_label, new_val_label),
         ]
 
+    def __search_animation(self, key, found: bool) -> list:
+        """Sweep every key as if scanning, then settle on the outcome."""
+        animations = []
+        for index, candidate in enumerate(dict.keys(self)):
+            key_square, _, _, _ = self.mobject.items[index]
+            key_square.set_fill(mn.WHITE, opacity=0.5)
+            settled = 0.5 if found and candidate == key else 0.0
+            animations.append(key_square.animate.set_fill(mn.WHITE, opacity=settled))
+        return animations
+
+    def __contains__(self, key):
+        """Show the search that `in` performs, hit or miss.
+
+        A miss that drew nothing would be indistinguishable from a frame the
+        tool forgot to render, so both outcomes sweep; only the settle differs.
+        """
+        found = dict.__contains__(self, key)
+        self.animation_queue.extend(self.__search_animation(key, found))
+        return found
+
     def __delitem__(self, key):
         index = list(super().keys()).index(key)
         super().__delitem__(key)
@@ -86,7 +106,7 @@ class Dict(Animated, dict):
 
     def __getitem__(self, key):
         """Highlight the key-value pair for the given key."""
-        if key in self:
+        if dict.__contains__(self, key):
             index = list(super().keys()).index(key)
             self.animation_queue.extend(self.__highlight_key_animation(index))
             self.animation_queue.extend(self.__highlight_val_animation(index))
@@ -95,7 +115,7 @@ class Dict(Animated, dict):
             raise KeyError(f"Key {key} not found.")
 
     def __setitem__(self, key, value):
-        if key in self:
+        if dict.__contains__(self, key):
             index = list(super().keys()).index(key)
             super().__setitem__(key, value)
             self.animation_queue.extend(self.__highlight_key_animation(index))

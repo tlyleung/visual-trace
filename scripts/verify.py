@@ -112,11 +112,15 @@ def pick(frames: list[Path], count: int) -> list[Path]:
     return [frames[min(len(frames) - 1, round(i * step))] for i in range(count)]
 
 
-ROIS = {"code": "50%x100%+0+0", "table": "50%x100%+50%+0"}
+# Gravity, not an offset: ImageMagick reads "+50%+0" as +50 *pixels*, so a
+# percentage offset silently crops the wrong half.
+ROIS = {"code": "West", "table": "East"}
 
 
 def caption(src: Path, dest: Path, text: str, tile_width: int, roi: str | None) -> None:
-    crop = ["-crop", ROIS[roi], "+repage"] if roi else []
+    crop = (
+        ["-gravity", ROIS[roi], "-crop", "50%x100%+0+0", "+repage"] if roi else []
+    )
     sh("convert", src, *crop,
        "-resize", f"{tile_width}x",
        "-background", "#101014", "-gravity", "North", "-splice", f"0x{CAPTION_BAR}",
