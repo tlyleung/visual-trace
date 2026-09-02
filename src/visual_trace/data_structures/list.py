@@ -52,6 +52,19 @@ class List(Animated, list):
             self.__highlight(index)
         return value
 
+    def __iter__(self):
+        """Light each cell as it is handed out.
+
+        Iteration is the one read that genuinely walks the container, one
+        element at a time, so unlike `len` it earns an animation per element --
+        and it is what a `for num in nums` loop is made of. Lighting happens as
+        each value is yielded, so a loop that breaks early only lights what it
+        actually reached.
+        """
+        for index, value in enumerate(list.__iter__(self)):
+            self.__highlight(index)
+            yield value
+
     def append(self, value: object) -> None:
         """Animate adding a new square and label."""
         list.append(self, value)

@@ -5,7 +5,7 @@ and both were silent, so the array it scans never reacted and the branch the
 algorithm turns on showed nothing.
 """
 
-from stubs import drain, render_step, settle, square_opacities
+from stubs import drain, realize, render_step, settle, square_opacities
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 
@@ -75,3 +75,33 @@ def test_lookup_does_not_also_trigger_a_search():
     d["b"]
     lit = [index for index, value in enumerate(key_opacities(d)) if value]
     assert lit == [1], f"expected only the looked-up key to light, got {lit}"
+
+
+def highlighted_cells(structure, slot: int = 0) -> list[int]:
+    """Which cells the queued animations point at, in order."""
+    cells = {id(cell[slot]): index for index, cell in enumerate(structure.mobject.items)}
+    return [
+        cells[id(animation.mobject)]
+        for animation in realize(structure.animation_queue)
+        if id(animation.mobject) in cells
+    ]
+
+
+def test_iterating_lights_each_cell_in_turn():
+    """`for num in nums` genuinely walks the container, so it earns a cell each.
+
+    This is the read `max_sub_array` is made of; without it the array being
+    scanned never reacts for the whole video.
+    """
+    nums = drawn_list()
+    assert list(nums) == [2, 7, 11]
+    assert highlighted_cells(nums) == [0, 1, 2]
+
+
+def test_a_partial_iteration_only_lights_what_it_reached():
+    """The animation has to track what was consumed, not what exists."""
+    nums = drawn_list()
+    for value in nums:
+        if value == 7:
+            break
+    assert highlighted_cells(nums) == [0, 1]
