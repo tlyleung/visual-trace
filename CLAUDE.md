@@ -143,15 +143,27 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
   across two rows (0.463 against a 0.253 norm). A blank line's own box collapses to
   the origin. Use the `code.line_numbers` ladder, which is uniform to 2e-03;
   `utils/highlight.row_center` does this.
+- **Empty and null mobjects poison bounding boxes**, and it has bitten three
+  times now: blank code lines collapse to the origin, a `List` whose group is
+  still empty reports zero extent there, and `become` padding leaves zero-area
+  points there. Before trusting a bbox, check the mobject actually draws
+  something — `family_members_with_points()`.
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.
 
 ### Known-failing invariants
 
-None. All twelve are green on both examples — so any failure is a regression you
-just introduced, not background noise. Keep it that way: if you add an invariant
-that cannot pass yet, record it here with the reason.
+- `table_rows_disjoint` — fails at the step after `scores.clear()` in
+  `dict_operations`. `become` aligns two mobject families by padding the shorter
+  one, and when a cell goes from populated to empty the padding leaves real
+  zero-area points at the origin. Nothing renders there, but the row's bounding
+  box is dragged down to y=0 and overlaps its neighbour. Latent in the `become`
+  approach all along; only reachable now that a cleared dict actually empties.
+
+Everything else is green on all three examples, so any other failure is a
+regression you just introduced. If you add an invariant that cannot pass yet,
+record it here with the reason.
 
 Other latent bugs, unrelated to rendering: `tracing.py` stores
 `variables[variable] = type(variable)` — the type of the *name string*, always

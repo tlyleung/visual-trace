@@ -1,0 +1,21 @@
+from visual_trace.data_structures.dict import Dict
+
+
+def dict_operations(scores: Dict) -> int:
+    total = 0
+    for value in scores.values():
+        total += value
+    scores["d"] = total
+    scores.clear()
+    return total
+
+
+def main():
+    args = (Dict(a=5, b=5, c=9),)
+    func = dict_operations
+    return func, args
+
+
+if __name__ == "__main__":
+    func, args = main()
+    print(func(*args))

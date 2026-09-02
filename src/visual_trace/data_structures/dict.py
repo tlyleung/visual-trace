@@ -10,14 +10,20 @@ class Dict(dict):
 
     def __init__(self, **kwargs):
         super().__init__(kwargs)
+        self.kwargs = kwargs
         self.mobject = mn.VMobject()
         self.mobject.items = mn.VGroup()
 
         self.animation_queue = []
+        self.pending_operations = []
         for key, value in kwargs.items():
             self.animation_queue.extend(self.__append_animation(key, value))
 
         self.mobject.add(self.mobject.items)
+
+    def reset(self):
+        """Return a fresh instance with the same initial arguments."""
+        return type(self)(**self.kwargs)
 
     def __append_animation(self, key, value):
         key_square = mn.Square(side_length=0.5, fill_color=mn.WHITE, fill_opacity=0.0)
@@ -104,31 +110,41 @@ class Dict(dict):
 
     def items(self):
         """Return an animated list of key-value pairs."""
-        for key, value in super().items():
-            index = list(super().keys()).index(key)
+        for index, (key, value) in enumerate(super().items()):
             self.animation_queue.extend(self.__highlight_key_animation(index))
             self.animation_queue.extend(self.__highlight_val_animation(index))
             yield key, value
 
     def keys(self):
         """Return an animated list of keys."""
-        for key in super().keys():
-            index = list(super().keys()).index(key)
+        for index, key in enumerate(super().keys()):
             self.animation_queue.extend(self.__highlight_key_animation(index))
             yield key
 
     def values(self):
-        """Return an animated list of values."""
-        for value in super().values():
-            index = list(super().values()).index(value)
+        """Return an animated list of values.
+
+        Indexed by position, not by looking the value up: `list(...).index(v)`
+        returns the first match, so a repeated value would re-highlight the
+        earlier cell and never its own.
+        """
+        for index, value in enumerate(super().values()):
             self.animation_queue.extend(self.__highlight_val_animation(index))
             yield value
 
     def clear(self):
-        """Clear all items from the dict and animate their removal."""
-        animations = []
-        for item in self.mobject.items:
-            animations.extend([mn.FadeOut(item)])
-        self.mobject.items = mn.VGroup()
-        self.animation_queue.extend(animations)
+        """Clear all items from the dict and animate their removal.
+
+        Empties the attached group rather than rebinding the attribute to a new
+        one: the group added in `__init__` is what is actually drawn, so swapping
+        it leaves the old cells on screen and the replacement detached.
+        """
+        items = list(self.mobject.items)
+        self.animation_queue.extend(mn.FadeOut(item) for item in items)
+        if items:
+            # Detach only once the fade has played. Emptying now would have the
+            # table lay out nothing while the cells are still on screen.
+            self.pending_operations.append(
+                lambda: self.mobject.items.remove(*items)
+            )
         super().clear()
