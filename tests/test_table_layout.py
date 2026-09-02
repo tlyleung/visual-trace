@@ -16,23 +16,20 @@ import manim as mn
 
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
-from visual_trace.utils.table import create_table111
+from stubs import SceneGraph, right_column
+from visual_trace.utils.table import create_table, create_table111, refresh_table
 
 TOL = 0.02
 
 
-class StubScene:
+class StubScene(SceneGraph):
     """The slice of `Animation` that `create_table111` actually touches."""
 
     def __init__(self, variables: dict):
+        super().__init__()
         self.variables = variables
         self.animation_queue = []
-        self.right_col = mn.Rectangle(
-            width=mn.config.frame_width / 2,
-            height=mn.config.frame_height,
-            stroke_width=0,
-        )
-        self.right_col.to_edge(mn.RIGHT, buff=0)
+        self.right_col = right_column()
 
 
 def render_step(local_vars: dict):
@@ -83,3 +80,42 @@ def test_list_draws_one_cell_per_element():
     nums = List(2, 7, 11, 15)
     render_step({"target": 9, "nums": nums})
     assert len(nums.mobject) == len(nums)
+
+
+def drain(structure) -> None:
+    for operation in structure.pending_operations:
+        operation()
+    structure.pending_operations.clear()
+
+
+def test_emptied_cell_leaves_no_phantom_row_geometry():
+    """A cell going from populated to empty must not pollute the row bounds.
+
+    `become` aligns two mobject families by padding the shorter one, and the
+    padding lands zero-area points at the origin. Nothing renders there, but the
+    row's bounding box is dragged to y=0 and swallows its neighbour -- which
+    breaks anything that positions relative to the table.
+    """
+    scores = Dict(a=5, b=5, c=9)
+    drain(scores)
+    local = {"scores": scores, "total": 19, "value": 9}
+
+    scene = StubScene(dict.fromkeys(local))
+    scene.table = create_table(scene)
+    refresh_table(scene, local)
+
+    scores.clear()
+    drain(scores)
+    refresh_table(scene, local)
+
+    rows = list(scene.table.get_rows())
+    for index, (upper, lower) in enumerate(zip(rows, rows[1:])):
+        overlap = min(
+            float(upper.get_corner(mn.UL)[1]), float(lower.get_corner(mn.UL)[1])
+        ) - max(
+            float(upper.get_corner(mn.DR)[1]), float(lower.get_corner(mn.DR)[1])
+        )
+        assert overlap <= TOL, (
+            f"rows {index} and {index + 1} overlap by {overlap:.3f} after a "
+            f"cell emptied"
+        )

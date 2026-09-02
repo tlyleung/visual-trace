@@ -14,16 +14,18 @@ import inspect
 import manim as mn
 from manim.animation.animation import prepare_animation
 
+from stubs import SceneGraph, right_column
 from visual_trace.data_structures.list import List
 from visual_trace.utils.highlight import create_highlight, row_center
 from visual_trace.utils.table import create_table
 from visual_trace.utils.tracing import start_tracing
 
 
-class RecordingScene:
+class RecordingScene(SceneGraph):
     """Drives the tracer without a renderer, logging each play() call."""
 
     def __init__(self, func):
+        super().__init__()
         self.func = func
         self.source_lines, self.start_line_number = inspect.getsourcelines(func)
         self.code = mn.Code(
@@ -34,12 +36,7 @@ class RecordingScene:
         )
         self.code.scale(0.5)
         self.highlight = create_highlight(1, self.code)
-        self.right_col = mn.Rectangle(
-            width=mn.config.frame_width / 2,
-            height=mn.config.frame_height,
-            stroke_width=0,
-        )
-        self.right_col.to_edge(mn.RIGHT, buff=0)
+        self.right_col = right_column()
         self.animation_queue = []
         self.variables = {}
         self.trace_pass = 2

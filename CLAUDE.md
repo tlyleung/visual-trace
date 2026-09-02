@@ -40,6 +40,11 @@ because a structure whose group is still empty at layout time gets arranged as
 nothing and its contents then materialise at the origin. `Dict` mutates its
 mobject inline instead — the two classes still disagree on this contract.
 
+`refresh_table` swaps the whole table mobject in rather than `become`-ing the old
+one onto the new. `become` aligns families by padding, which strands zero-area
+points at the origin when a cell empties and silently corrupts every bounding box
+containing them.
+
 **Each traced step plays twice.** `sys.settrace` fires a `line` event *before*
 the line runs, so a line's animations only reach the tracer at the following
 event. The tracer therefore draws the previous line's effects while the highlight
@@ -154,16 +159,14 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
 
 ### Known-failing invariants
 
-- `table_rows_disjoint` — fails at the step after `scores.clear()` in
-  `dict_operations`. `become` aligns two mobject families by padding the shorter
-  one, and when a cell goes from populated to empty the padding leaves real
-  zero-area points at the origin. Nothing renders there, but the row's bounding
-  box is dragged down to y=0 and overlaps its neighbour. Latent in the `become`
-  approach all along; only reachable now that a cleared dict actually empties.
+None. Every invariant is green on all three examples, so any failure is a
+regression you just introduced, not background noise. Keep it that way: if you
+add an invariant that cannot pass yet, record it here with the reason.
 
-Everything else is green on all three examples, so any other failure is a
-regression you just introduced. If you add an invariant that cannot pass yet,
-record it here with the reason.
+Note that `list_square_count` and `list_squares_contiguous` report nothing at all
+for `dict_operations`, which has no List in scope. An invariant with no subject is
+silent, not passing — read the per-invariant step counts, not just the absence of
+failures.
 
 Other latent bugs, unrelated to rendering: `tracing.py` stores
 `variables[variable] = type(variable)` — the type of the *name string*, always

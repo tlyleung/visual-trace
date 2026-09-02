@@ -6,7 +6,7 @@ import manim as mn
 
 from .highlight import row_center
 from .probe import probe_step
-from .table import create_table111
+from .table import refresh_table
 from .trace_log import safe_repr
 
 
@@ -77,9 +77,7 @@ def trace_func(
                 # Refresh the table, harvesting whatever the previous line
                 # queued as it executed. Tree mutations are already applied by
                 # create_table111, which must run them before laying out.
-                old_table = scene.table
-                new_table = create_table111(frame.f_locals, scene)
-                old_table.become(new_table)
+                refresh_table(scene, frame.f_locals)
                 applied = getattr(scene, "applied_operations", 0)
 
                 queued = list(scene.animation_queue)
