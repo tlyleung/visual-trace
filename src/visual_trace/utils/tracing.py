@@ -11,7 +11,7 @@ from .trace_log import safe_repr
 
 
 def record_step(
-    scene: mn.Scene, frame: FrameType, lineno: int, queued: int, pending: int
+    scene: mn.Scene, frame: FrameType, lineno: int, queued: int, applied: int
 ) -> None:
     """Log and probe a settled step. No-op outside the animating pass."""
     if getattr(scene, "trace_pass", 0) != 2:
@@ -35,7 +35,7 @@ def record_step(
         "src": source,
         "locals": {k: safe_repr(v) for k, v in frame.f_locals.items()},
         "queued": queued,
-        "pending": pending,
+        "applied": applied,
         # Only a step that queued animations produces a partial movie file, so
         # frame extraction needs this to line steps up with the files on disk.
         "played": queued > 0,
@@ -75,21 +75,18 @@ def trace_func(
                 new_table = create_table111(frame.f_locals, scene)
                 old_table.become(new_table)
 
-            # What this step queued, captured before the queues drain below
+            # What this step queued, captured before the queue drains below.
+            # Tree mutations are already applied by create_table111, which has
+            # to run them before it lays the mobjects out.
             queued = len(scene.animation_queue)
-            pending = len(scene.pending_operations)
+            applied = getattr(scene, "applied_operations", 0)
 
             # Play animation
             if scene.animation_queue:
                 scene.play(*scene.animation_queue)
                 scene.animation_queue.clear()
 
-            if scene.pending_operations:
-                for operation in scene.pending_operations:
-                    operation()
-                scene.pending_operations.clear()
-
-            record_step(scene, frame, lineno, queued, pending)
+            record_step(scene, frame, lineno, queued, applied)
 
     return lambda *args, **kwargs: trace_func(
         *args, **kwargs, func=func, scene=scene, variables=variables

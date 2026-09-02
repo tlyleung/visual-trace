@@ -18,7 +18,6 @@ class Animation(mn.Scene):
 
     def construct(self):
         self.animation_queue = []
-        self.pending_operations = []
 
         # Verification instrumentation. Inert unless VISUAL_TRACE_LOG is set.
         self.trace_log = open_log()

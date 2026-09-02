@@ -28,9 +28,6 @@ def update_table(local_vars: dict, scene: mn.Scene) -> list[mn.Animation]:
                     scene.animation_queue.extend(v.animation_queue)
                     v.animation_queue.clear()
 
-                # if hasattr(v, "pending_operations"):
-                #     scene.pending_operations.extend(v.pending_operations)
-                #     v.pending_operations.clear()
 
             else:
                 new_cell = mn.Text(str(v), font_size=24)
@@ -46,21 +43,27 @@ def update_table(local_vars: dict, scene: mn.Scene) -> list[mn.Animation]:
 
 def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
     data = []
+    applied = 0
     for name in scene.variables.keys():
         if name in local_vars:
             v = local_vars[name]
 
             if hasattr(v, "mobject"):
-                mobject = v.mobject
-
                 if hasattr(v, "animation_queue"):
                     scene.animation_queue.extend(v.animation_queue)
-                    # scene.animation_queue.append(mn.AnimationGroup(*v.animation_queue))
                     v.animation_queue.clear()
 
+                # Apply deferred tree mutations before the table lays the
+                # mobject out. Carrying them past this point means the table
+                # arranges an empty group, and the contents then materialise at
+                # the origin instead of in the cell they were assigned.
                 if hasattr(v, "pending_operations"):
-                    scene.pending_operations.extend(v.pending_operations)
+                    for operation in v.pending_operations:
+                        operation()
+                    applied += len(v.pending_operations)
                     v.pending_operations.clear()
+
+                mobject = v.mobject
 
             else:
                 mobject = mn.Text(str(v), font_size=24)
@@ -76,4 +79,5 @@ def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
         arrange_in_grid_config={"cell_alignment": mn.LEFT},
     )
     table.align_to(scene.right_col, mn.LEFT)
+    scene.applied_operations = applied
     return table

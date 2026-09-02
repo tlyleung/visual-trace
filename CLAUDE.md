@@ -64,6 +64,47 @@ filmstrip of one step, `--diff NAME` for a pixel diff against a saved baseline.
 
 Everything lands in `media/verify/<example>/`, which is gitignored.
 
+### Working test-first
+
+There are two tiers, and a change should be driven by the fastest one that can
+express it.
+
+```bash
+uv run pytest tests/ -q                              # ~1s, pure geometry and state
+uv run scripts/verify.py examples/two_sum.py         # ~8s, real render + probe
+```
+
+`tests/` covers what can be checked without rendering, using a `StubScene` that
+supplies only the handful of attributes the code under test touches. The probe
+covers the rest. Add to `tests/` when you can; fall back to a probe invariant
+when the property only exists in a rendered frame.
+
+The loop is **red, confirm, green, mutate**:
+
+1. Write the failing check first.
+2. **Read the failure text and confirm it fails for the reason you expect.** Red
+   is not evidence the test is right.
+3. Fix until green.
+4. **Break the code a second, different way and confirm it goes red again.**
+
+Step 4 is not optional here, because in this codebase a check that cannot fail
+looks exactly like a check that passes. Three real cases, all caught only by
+mutating:
+
+- `highlight_covers_line` was red for two commits over a genuine bug, but was
+  itself **unsatisfiable** — consecutive `code_lines` boxes overlap by ~0.099, so
+  no band could ever contain one without covering its neighbours.
+- The first table-layout test compared a value against the bounds of the table
+  that **owns** it. Draining the deferred work inflated the parent to swallow the
+  child, so it passed vacuously. Never assert a child against its parent's bounds;
+  use a sibling, such as the row's label.
+- The second version passed because an **empty** mobject has a degenerate bbox at
+  the origin, which is trivially "inside" anything. Assert
+  `family_members_with_points()` before asserting position.
+
+Related trap: use at least two table rows in a layout test. A single row sits at
+y=0, which is exactly where a mislaid mobject lands, so the bug hides.
+
 ### Things that will bite you
 
 - **Instrumentation is env-gated and must stay inert.** `VISUAL_TRACE_LOG` turns
@@ -98,11 +139,6 @@ Everything lands in `media/verify/<example>/`, which is gitignored.
 These fail on `master` today. They are pre-existing bugs, not regressions — treat
 them as the background, and watch for *changes* to this list.
 
-- `structures_inside_table` — fails at step 0 in both examples. `create_table111`
-  puts `v.mobject` into a freshly built table and then `become`s the old one onto
-  it; `become` copies points but the mobject stays parented to the discarded
-  table, so it is left at its construction position near the origin.
-- `table_rows_disjoint` — fails at step 0 of `two_sum`, same root cause.
 - **One-step animation lag** (no invariant yet). `create_table111` reads
   `frame.f_locals` at the *start* of a line, so an append on line N is not drawn
   until step N+1. Visible in the log as `queued` attributed to the wrong line, and

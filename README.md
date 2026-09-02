@@ -33,7 +33,8 @@ verification loop fit together.
 ## Verifying changes
 
 ```bash
-uv run scripts/verify.py examples/two_sum.py
+uv run pytest tests/ -q                       # fast geometry checks
+uv run scripts/verify.py examples/two_sum.py   # full render + probe
 ```
 
 Renders an example and reports per-step geometry assertions plus a contact sheet

@@ -177,7 +177,7 @@ def report(records: list[dict]) -> int:
     print("-" * 78)
     for rec in records:
         print(f"{rec['step']:>4} {rec['lineno']:>4} "
-              f"{rec['queued']:>2}/{rec['pending']:<3}  {rec['src'].strip()[:56]}")
+              f"{rec['queued']:>2}/{rec['applied']:<3}  {rec['src'].strip()[:56]}")
         for check in rec.get("checks", []):
             if check["ok"] is True:
                 continue
