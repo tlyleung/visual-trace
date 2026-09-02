@@ -234,7 +234,14 @@ rather than correcting it:
 
 ### Known-failing invariants
 
-None. Every invariant is green on all three examples, so any failure is a
+- `within_frame` fails on every step of `max_sub_array`. Nine cells is 4.5 units
+  wide, pushing the value column to x=7.494 against a frame edge of 7.111 -- the
+  last cell is clipped by roughly 52px at 1080p. Nothing in the layout adapts to a
+  container wider than its column. The fix belongs in `build_table`: scale an
+  oversized structure to fit its cell, so it covers whatever structure comes next
+  as well.
+
+Otherwise none. Every invariant is green on all three examples, so any failure is a
 regression you just introduced, not background noise. Keep it that way: if you
 add an invariant that cannot pass yet, record it here with the reason.
 
