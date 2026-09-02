@@ -1,19 +1,10 @@
 import sys
-import types
-from importlib import util
 from pathlib import Path
 
 import manim as mn
 
 from visual_trace.scenes.base import Animation
-
-
-def load_script(script_path: Path) -> types.ModuleType:
-    """Dynamically load a Python script and return its namespace."""
-    spec = util.spec_from_file_location("user_script", script_path)
-    module = util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from visual_trace.utils.loader import load_target
 
 
 def main():
@@ -26,14 +17,11 @@ def main():
         print(f"Error: File {script_path} does not exist.")
         sys.exit(1)
 
-    script = load_script(script_path)
-
-    # Extract function and arguments
-    if not hasattr(script, "main"):
-        print("Error: The script must define a `main()` function.")
+    try:
+        func, args = load_target(Path(script_path))
+    except AttributeError as exc:
+        print(f"Error: {exc}")
         sys.exit(1)
-
-    func, args = script.main()
 
     # Configure Manim
     mn.config.quality = "low_quality"

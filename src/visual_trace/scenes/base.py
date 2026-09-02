@@ -5,6 +5,7 @@ import manim as mn
 
 from ..utils.highlight import create_highlight
 from ..utils.table import create_table
+from ..utils.trace_log import open_log
 from ..utils.tracing import start_tracing
 
 
@@ -19,6 +20,11 @@ class Animation(mn.Scene):
         self.animation_queue = []
         self.pending_operations = []
 
+        # Verification instrumentation. Inert unless VISUAL_TRACE_LOG is set.
+        self.trace_log = open_log()
+        self.trace_pass = 0
+        self.step = 0
+
         # Layout
         width = mn.config.frame_width / 2
         height = mn.config.frame_height
@@ -30,7 +36,7 @@ class Animation(mn.Scene):
 
         # Create code listing with highlight
         code_string = inspect.getsource(self.func)
-        self.start_line_number = inspect.getsourcelines(self.func)[1]
+        self.source_lines, self.start_line_number = inspect.getsourcelines(self.func)
 
         # Transform code to use animated data structures
         # code = transform_code(code)
@@ -49,6 +55,7 @@ class Animation(mn.Scene):
         self.add(self.highlight)
 
         # Create variables table using first trace
+        self.trace_pass = 1
         _, self.variables = start_tracing(self, self.func, *self.args, **self.kwargs)
         self.table = create_table(self)
         self.add(self.table)
@@ -59,5 +66,9 @@ class Animation(mn.Scene):
         )
 
         # Animate using second trace
+        self.trace_pass = 2
         start_tracing(self, self.func, *self.args, **self.kwargs)
         self.wait()
+
+        if self.trace_log is not None:
+            self.trace_log.close()

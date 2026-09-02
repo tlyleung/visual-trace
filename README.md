@@ -27,7 +27,17 @@ uv run scripts/cli.py examples/max_sub_array.py
 
 ## Implementation
 
-TODO: explain how the implementation works
+See [CLAUDE.md](CLAUDE.md) for how tracing, the animation queue, and the
+verification loop fit together.
+
+## Verifying changes
+
+```bash
+uv run scripts/verify.py examples/two_sum.py
+```
+
+Renders an example and reports per-step geometry assertions plus a contact sheet
+in `media/verify/`, so a change can be checked without watching the video.
 
 ## License
 
