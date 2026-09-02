@@ -29,7 +29,7 @@ animations, then drains `pending_operations`.
 The interesting design: `data_structures/List` and `Dict` pair a builtin
 container with a Manim mobject and override its methods so ordinary use has a
 visual side effect — `Dict.__getitem__` highlights a cell just because you indexed
-it. `utils/table.py:create_table111` drains those queues into the scene each step.
+it. `utils/table.py:build_table` drains those queues into the scene each step.
 The animation is not scripted; it falls out of the algorithm's own data access
 pattern.
 
@@ -53,7 +53,7 @@ wrong.
 inline, because a structure whose group is still empty when the table lays out
 gets arranged as nothing and its contents then materialise at the origin. Only
 *removals* are deferred: a cell has to stay parented long enough for its fade to
-be built against it. `create_table111` runs the deferred work immediately before
+be built against it. `build_table` runs the deferred work immediately before
 laying out.
 
 `refresh_table` swaps the whole table mobject in rather than `become`-ing the old
@@ -247,5 +247,5 @@ Other latent bugs, unrelated to rendering: `tracing.py` stores
 `variables[variable] = type(variable)` — the type of the *name string*, always
 `str`; only the keys are used downstream, so it is harmless but misleading.
 `utils/transform.py` is an entirely commented-out AST approach that would have
-rewritten `list` -> `List` automatically, and `create_table111` still carries its
+rewritten `list` -> `List` automatically, and `build_table` still carries its
 placeholder name.

@@ -211,7 +211,7 @@ def structures_inside_table(scene, lineno, local_vars) -> list[dict]:
 
     A structure whose group is empty when the table lays out gets arranged as
     nothing, and its contents then materialise at the world origin rather than in
-    the cell they were assigned -- which is why `create_table111` applies the
+    the cell they were assigned -- which is why `build_table` applies the
     deferred tree mutations before it builds the table.
     """
     checks = []

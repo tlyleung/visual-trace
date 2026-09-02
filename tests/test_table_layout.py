@@ -20,7 +20,7 @@ from stubs import (
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 from visual_trace.utils.probe import overlap as probe_overlap, x_range
-from visual_trace.utils.table import create_table, create_table111, refresh_table
+from visual_trace.utils.table import build_table, refresh_table
 
 
 def test_list_materialises_in_its_row():
@@ -55,7 +55,7 @@ def test_emptied_cell_leaves_no_phantom_row_geometry():
     local = {"scores": scores, "total": 19, "value": 9}
 
     scene = StubScene(dict.fromkeys(local))
-    scene.table = create_table(scene)
+    scene.table, _ = build_table(scene, {})
     refresh_table(scene, local)
 
     scores.clear()
@@ -94,7 +94,7 @@ def test_cells_stay_contiguous_across_steps():
 def test_the_return_value_gets_its_own_row():
     """Reserved from the first frame so the row set never shifts."""
     scene = StubScene({"total": None, "return": None})
-    table, _ = create_table111({"total": 19, "return": "(0, 1)"}, scene)
+    table, _ = build_table(scene, {"total": 19, "return": "(0, 1)"})
     rows = table.get_rows()
     # `.text` is the glyph string, with spaces stripped; `original_text` is
     # what was actually asked for and what gets rendered.
@@ -104,7 +104,7 @@ def test_the_return_value_gets_its_own_row():
 
 def test_the_return_row_reads_undefined_until_the_function_returns():
     scene = StubScene({"total": None, "return": None})
-    table, _ = create_table111({"total": 19}, scene)
+    table, _ = build_table(scene, {"total": 19})
     assert table.get_rows()[-1][1].original_text == "Undefined"
 
 
@@ -121,12 +121,12 @@ def test_rows_sit_at_a_fixed_pitch_whatever_the_cells_hold():
     the whole panel jumping, and no single-step check can see it.
     """
     names = {"a": None, "b": None, "c": None}
-    plain, _ = create_table111({"a": 1, "b": 2, "c": 3}, StubScene(dict(names)))
+    plain, _ = build_table(StubScene(dict(names)), {"a": 1, "b": 2, "c": 3})
 
     tall = Dict(x=1)
     drain(tall)
-    with_structure, _ = create_table111(
-        {"a": 1, "b": tall, "c": 3}, StubScene(dict(names))
+    with_structure, _ = build_table(
+        StubScene(dict(names)), {"a": 1, "b": tall, "c": 3}
     )
 
     assert label_positions(plain) == label_positions(with_structure)

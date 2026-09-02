@@ -9,7 +9,7 @@ import manim as mn
 from manim.animation.animation import prepare_animation
 
 from visual_trace.utils.probe import visible_range, x_range
-from visual_trace.utils.table import create_table111, realize_animations
+from visual_trace.utils.table import build_table, realize_animations
 
 TOL = 0.02
 
@@ -35,7 +35,7 @@ class SceneGraph:
 
 
 def right_column() -> mn.Rectangle:
-    """The invisible anchor `create_table111` aligns the table against."""
+    """The invisible anchor `build_table` aligns the table against."""
     column = mn.Rectangle(
         width=mn.config.frame_width / 2,
         height=mn.config.frame_height,
@@ -46,7 +46,7 @@ def right_column() -> mn.Rectangle:
 
 
 class StubScene(SceneGraph):
-    """The slice of `Animation` that `create_table111` actually touches."""
+    """The slice of `Animation` that `build_table` actually touches."""
 
     def __init__(self, variables: dict):
         super().__init__()
@@ -62,9 +62,9 @@ class Step(NamedTuple):
 
 
 def render_step(local_vars: dict) -> Step:
-    """One traced step. `create_table111` applies deferred work itself."""
+    """One traced step. `build_table` applies deferred work itself."""
     scene = StubScene(dict.fromkeys(local_vars))
-    table, applied = create_table111(local_vars, scene)
+    table, applied = build_table(scene, local_vars)
     return Step(scene, table, applied)
 
 

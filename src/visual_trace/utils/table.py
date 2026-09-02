@@ -7,23 +7,14 @@ from ..data_structures.base import Animated
 ROW_PITCH = 1.15
 
 
-def create_table(scene: mn.Scene) -> mn.MobjectTable:
-    table = mn.MobjectTable(
-        [
-            [mn.Text(name, font_size=24), mn.Text("Undefined", font_size=24)]
-            for name in scene.variables.keys()
-        ],
-        line_config={"stroke_width": 0},
-        arrange_in_grid_config={"cell_alignment": mn.LEFT},
-    )
-    table.align_to(scene.right_col, mn.LEFT)
-    _pin_rows(table)
-    return table
-
-
-def create_table111(
-    local_vars: dict, scene: mn.Scene
+def build_table(
+    scene: mn.Scene, local_vars: dict
 ) -> tuple[mn.MobjectTable, int]:
+    """Build the variables table for the current locals.
+
+    Called with no locals it renders every row "Undefined", which is what the
+    scene wants before the traced function has run.
+    """
     data = []
     applied = 0
     deferred = []
@@ -84,7 +75,7 @@ def refresh_table(
     equivalent on screen -- this runs outside any animation, so the table
     updates instantly either way.
     """
-    new_table, applied = create_table111(local_vars, scene)
+    new_table, applied = build_table(scene, local_vars)
     scene.remove(scene.table)
     scene.add(new_table)
     scene.table = new_table

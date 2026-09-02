@@ -18,7 +18,7 @@ from stubs import SceneGraph, right_column
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 from visual_trace.utils.highlight import create_highlight, row_center
-from visual_trace.utils.table import create_table
+from visual_trace.utils.table import build_table
 from visual_trace.utils.tracing import ANIMATING_PASS, flush, start_tracing
 
 
@@ -73,7 +73,7 @@ def drive(func, *args):
     """Mirror Animation.construct: harvest names, reset, then animate."""
     scene = RecordingScene(func)
     _, scene.variables = start_tracing(scene, func, *args)
-    scene.table = create_table(scene)
+    scene.table, _ = build_table(scene, {})
     # Without this the second pass inherits the first pass's mutations and
     # its leftover animation queue, exactly as the real scene would.
     args = tuple(a.reset() if hasattr(a, "reset") else a for a in args)

@@ -51,7 +51,7 @@ class Animated:
     ``pending_operations``
         Mobject-tree mutations that must not happen yet -- removals, which have
         to outlive the fade that animates them. Additions go in directly, since
-        `create_table111` needs a populated group to lay out.
+        `build_table` needs a populated group to lay out.
     """
 
     def __init__(self, mobject: mn.Mobject, *args: Any, **kwargs: Any):

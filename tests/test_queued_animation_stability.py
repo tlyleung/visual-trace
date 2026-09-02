@@ -1,6 +1,6 @@
 """A queued animation must not move the mobject it animates.
 
-Animations are queued while user code runs, and `create_table111` repositions
+Animations are queued while user code runs, and `build_table` repositions
 every cell afterwards when it lays the table out. `.animate` snapshots its target
 the moment the builder is created, so an animation built before the layout and
 played after it interpolates the mobject back to where it used to be -- a cell
@@ -13,7 +13,7 @@ No settled-frame check can see this: the animation ends at the correct position.
 from stubs import StubScene, drain, play_all, settle
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
-from visual_trace.utils.table import create_table111
+from visual_trace.utils.table import build_table
 
 
 def positions(mobject) -> list[tuple[float, float]]:
@@ -27,7 +27,7 @@ def lay_out_and_play(structure, name):
     """Queue, lay out (which moves things), then play -- the real order."""
     local = {"target": 9, name: structure}
     scene = StubScene(dict.fromkeys(local))
-    create_table111(local, scene)
+    build_table(scene, local)
     before = positions(structure.mobject)
     play_all(scene.animation_queue)
     return before, positions(structure.mobject)
