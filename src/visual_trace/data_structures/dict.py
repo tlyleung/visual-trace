@@ -12,14 +12,11 @@ class Dict(Animated, dict):
 
     def __init__(self, **kwargs):
         dict.__init__(self, kwargs)
-        mobject = mn.VMobject()
-        mobject.items = mn.VGroup()
-        Animated.__init__(self, mobject, **kwargs)
+        Animated.__init__(self, mn.VMobject(), **kwargs)
+        self._init_placeholder(rows=2)
 
         for key, value in kwargs.items():
             self.animation_queue.extend(self.__append_animation(key, value))
-
-        self.mobject.add(self.mobject.items)
 
     def __append_animation(self, key, value):
         key_square = mn.Square(side_length=0.5, fill_color=mn.WHITE, fill_opacity=0.0)
@@ -34,7 +31,12 @@ class Dict(Animated, dict):
         val_label.move_to(val_square.get_center())
 
         item = mn.VGroup(key_square, key_label, val_square, val_label)
-        item.next_to(self.mobject.items, mn.RIGHT, buff=0)
+        # Only offset once there is something to sit beside. `next_to` an empty
+        # group puts the first cell's left edge on the origin, half a cell right
+        # of where the placeholder stands, so filling an empty dict would shift
+        # it sideways.
+        if len(self.mobject.items):
+            item.next_to(self.mobject.items, mn.RIGHT, buff=0)
 
         self.mobject.items.add(item)
 
@@ -103,6 +105,8 @@ class Dict(Animated, dict):
         index = list(super().keys()).index(key)
         super().__delitem__(key)
         self.animation_queue.extend(self.__remove_animation(index))
+        if not len(self):
+            self._show_placeholder(True)
 
     def __getitem__(self, key):
         """Highlight the key-value pair for the given key."""
@@ -121,7 +125,10 @@ class Dict(Animated, dict):
             self.animation_queue.extend(self.__highlight_key_animation(index))
             self.animation_queue.extend(self.__replace_val_animation(index, value))
         else:
+            was_empty = not len(self)
             super().__setitem__(key, value)
+            if was_empty:
+                self._show_placeholder(False)
             self.animation_queue.extend(self.__append_animation(key, value))
 
     def items(self):
@@ -164,3 +171,4 @@ class Dict(Animated, dict):
                 lambda: self.mobject.items.remove(*items)
             )
         super().clear()
+        self._show_placeholder(True)

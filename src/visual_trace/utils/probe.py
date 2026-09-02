@@ -12,10 +12,39 @@ Every read here is side-effect free -- notably it never calls the overridden
 from typing import Any
 
 import manim as mn
+import numpy as np
 
 from ..data_structures.base import Animated
 
 TOL = 0.02
+
+
+def _renders(mobject) -> bool:
+    """Whether a leaf actually puts ink on the frame."""
+    stroke = float(mobject.get_stroke_width() or 0) * float(
+        mobject.get_stroke_opacity() or 0
+    )
+    return stroke > 0 or float(mobject.get_fill_opacity() or 0) > 0
+
+
+def visible_range(mobject, axis: int) -> tuple[float, float] | None:
+    """Extent along ``axis`` of the parts that actually render, or None.
+
+    Manim bounding boxes count anything with points, visible or not, and this
+    project keeps tripping over that: MobjectTable draws its grid with
+    ``stroke_width=0`` lines that run far wider than any cell, `become` strands
+    zero-area points at the origin, and an empty group collapses there too. Every
+    one of those made a correct frame look wrong.
+    """
+    arrays = [
+        m.points
+        for m in mobject.family_members_with_points()
+        if len(m.points) and _renders(m)
+    ]
+    if not arrays:
+        return None
+    stacked = np.vstack(arrays)
+    return float(stacked[:, axis].min()), float(stacked[:, axis].max())
 
 
 def _x_range(m) -> tuple[float, float]:
@@ -142,7 +171,12 @@ def highlight_spans_code_width(scene, lineno, local_vars) -> list[dict]:
 
 
 def panels_disjoint(scene, lineno, local_vars) -> list[dict]:
-    ox, oy = _overlap(scene.code, scene.table)
+    code = visible_range(scene.code, axis=0)
+    table = visible_range(scene.table, axis=0)
+    if code is None or table is None:
+        return []
+    ox = min(code[1], table[1]) - max(code[0], table[0])
+    _, oy = _overlap(scene.code, scene.table)
     ok = not (ox > TOL and oy > TOL)
     return [
         _check(
@@ -202,11 +236,15 @@ def within_frame(scene, lineno, local_vars) -> list[dict]:
     checks = []
     targets = {"code": scene.code, "highlight": scene.highlight, "table": scene.table}
     for name, value in _tracked_lists(local_vars):
-        if len(value.mobject):
+        if len(value.mobject.items):
             targets[f"list:{name}"] = value.mobject
     for name, m in targets.items():
-        left, right = _x_range(m)
-        bottom, top = _y_range(m)
+        horizontal = visible_range(m, axis=0)
+        vertical = visible_range(m, axis=1)
+        if horizontal is None or vertical is None:
+            continue
+        left, right = horizontal
+        bottom, top = vertical
         ok = (
             left >= -half_w - TOL
             and right <= half_w + TOL
@@ -231,7 +269,7 @@ def list_square_count(scene, lineno, local_vars) -> list[dict]:
     """One drawn cell per element, once ``pending_operations`` have drained."""
     checks = []
     for name, value in _tracked_lists(local_vars):
-        drawn = len(value.mobject)
+        drawn = len(value.mobject.items)
         ok = drawn == len(value)
         checks.append(
             _check(
@@ -247,7 +285,7 @@ def list_squares_contiguous(scene, lineno, local_vars) -> list[dict]:
     """Adjacent cells should touch; a growing gap means positioning is wrong."""
     checks = []
     for name, value in _tracked_lists(local_vars):
-        items = list(value.mobject)
+        items = list(value.mobject.items)
         if len(items) < 2:
             continue
         gaps = []

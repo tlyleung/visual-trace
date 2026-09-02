@@ -11,6 +11,7 @@ class List(Animated, list):
     def __init__(self, *args):
         list.__init__(self, args)
         Animated.__init__(self, mn.VGroup(), *args)
+        self._init_placeholder(rows=1)
         for item in args:
             self.__draw(item)
 
@@ -26,21 +27,21 @@ class List(Animated, list):
         # Sit against the last drawn cell -- absolute placement would be wrong
         # once the table has moved the group into its own cell -- then step over
         # any cells queued in this same step that are not in the group yet.
-        if len(self.mobject):
-            cell.next_to(self.mobject[-1], mn.RIGHT, buff=0)
+        if len(self.mobject.items):
+            cell.next_to(self.mobject.items[-1], mn.RIGHT, buff=0)
         cell.shift(mn.RIGHT * (len(self.pending_operations) * 0.5))
 
         self.animation_queue.append(
             mn.AnimationGroup(mn.Create(square), mn.FadeIn(label))
         )
-        self.pending_operations.append(lambda: self.mobject.add(cell))
+        self.pending_operations.append(lambda: self.mobject.items.add(cell))
 
     def __highlight_animation(self, index: int) -> list:
         if index < 0:
-            index += len(self.mobject)
-        if not 0 <= index < len(self.mobject):
+            index += len(self.mobject.items)
+        if not 0 <= index < len(self.mobject.items):
             return []
-        square, _ = self.mobject[index]
+        square, _ = self.mobject.items[index]
         square.set_fill(mn.WHITE, opacity=0.5)
         return [square.animate.set_fill(mn.WHITE, opacity=0.0)]
 
@@ -61,5 +62,8 @@ class List(Animated, list):
 
     def append(self, value: object) -> None:
         """Animate adding a new square and label."""
+        was_empty = not len(self)
         list.append(self, value)
+        if was_empty:
+            self._show_placeholder(False)
         self.__draw(value)

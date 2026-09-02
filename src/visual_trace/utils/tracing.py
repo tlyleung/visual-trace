@@ -4,10 +4,13 @@ from typing import Any, Callable
 
 import manim as mn
 
+from ..data_structures.base import Animated
 from .highlight import row_center
 from .probe import probe_step
 from .table import refresh_table
 from .trace_log import safe_repr
+
+RETURN_ROW = "return"
 
 
 def record_step(
@@ -51,7 +54,7 @@ def record_step(
     log.emit(**record)
 
 
-def flush(scene: mn.Scene) -> int:
+def flush(scene: mn.Scene, result: Any = None) -> int:
     """Draw whatever the final traced line queued.
 
     Every other line's animations are harvested at the *following* line event.
@@ -62,6 +65,12 @@ def flush(scene: mn.Scene) -> int:
     if local_vars is None:
         return 0
 
+    # A returned structure is shown as text, not as its own mobject: it is
+    # already on screen under its variable name, and one mobject cannot occupy
+    # two cells. Anything else is passed through so the table and the log both
+    # render it once rather than repr-ing a repr.
+    display = safe_repr(result) if isinstance(result, Animated) else result
+    local_vars = {**local_vars, RETURN_ROW: display}
     refresh_table(scene, local_vars)
     queued = list(scene.animation_queue)
     scene.animation_queue.clear()

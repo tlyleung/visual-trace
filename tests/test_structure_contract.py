@@ -26,13 +26,13 @@ class Blob(Animated, list):
         label = mn.Text(str(value), font_size=24)
         cell = mn.VGroup(square, label)
         # Against the last drawn cell, then over the ones queued in this batch.
-        if len(self.mobject):
-            cell.next_to(self.mobject[-1], mn.RIGHT, buff=0)
+        if len(self.mobject.items):
+            cell.next_to(self.mobject.items[-1], mn.RIGHT, buff=0)
         cell.shift(mn.RIGHT * 0.5 * len(self.pending_operations))
         self.animation_queue.append(
             mn.AnimationGroup(mn.Create(square), mn.FadeIn(label))
         )
-        self.pending_operations.append(lambda: self.mobject.add(cell))
+        self.pending_operations.append(lambda: self.mobject.items.add(cell))
 
     def append(self, value) -> None:
         list.append(self, value)
@@ -48,7 +48,7 @@ def test_a_new_structure_is_laid_out_without_special_casing():
 def test_a_new_structure_draws_one_cell_per_element():
     blob = Blob(1, 2, 3)
     render_step({"target": 9, "blob": blob})
-    assert len(blob.mobject) == len(blob)
+    assert len(blob.mobject.items) == len(blob)
 
 
 def test_the_scene_drains_the_queue_and_applies_deferred_work():

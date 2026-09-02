@@ -33,6 +33,15 @@ it. `utils/table.py:create_table111` drains those queues into the scene each ste
 The animation is not scripted; it falls out of the algorithm's own data access
 pattern.
 
+Every container keeps its drawn cells in `mobject.items` and an empty-state
+outline in `mobject.placeholder`, so nothing else parented to the mobject is
+mistaken for a cell. An empty container must draw *something*: drawing nothing is
+indistinguishable from a rendering failure, and it hid real logic — searching an
+empty dict animated nothing at all.
+
+The variables table reserves a `return` row from the first frame, filled in by
+`flush`. Reserving it keeps the row set stable so nothing shifts at the end.
+
 `data_structures/base.py:Animated` is the contract they share, and is what a new
 structure (Stack, Queue, Tree, Graph) should be built on. It owns `mobject`, the
 two queues, and `reset()`; the scene tests `isinstance(v, Animated)` rather than
@@ -159,11 +168,13 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
   across two rows (0.463 against a 0.253 norm). A blank line's own box collapses to
   the origin. Use the `code.line_numbers` ladder, which is uniform to 2e-03;
   `utils/highlight.row_center` does this.
-- **Empty and null mobjects poison bounding boxes**, and it has bitten three
-  times now: blank code lines collapse to the origin, a `List` whose group is
-  still empty reports zero extent there, and `become` padding leaves zero-area
-  points there. Before trusting a bbox, check the mobject actually draws
-  something — `family_members_with_points()`.
+- **Manim bounding boxes count anything with points, visible or not**, and this
+  has bitten four times: blank code lines collapse to the origin, a `List` whose
+  group is still empty reports zero extent there, `become` padding strands
+  zero-area points there, and `MobjectTable` draws its grid with
+  `stroke_width=0` lines running far wider than any cell. Every one made a
+  correct frame look wrong. Use `probe.visible_range`, which counts only what
+  actually puts ink on the frame.
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.

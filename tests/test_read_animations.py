@@ -11,7 +11,7 @@ from visual_trace.data_structures.list import List
 
 
 def cell_opacities(nums: List) -> list[float]:
-    return [round(float(cell[0].get_fill_opacity()), 2) for cell in nums.mobject]
+    return [round(float(cell[0].get_fill_opacity()), 2) for cell in nums.mobject.items]
 
 
 def key_opacities(d: Dict) -> list[float]:

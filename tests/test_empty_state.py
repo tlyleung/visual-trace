@@ -1,0 +1,109 @@
+"""An empty container has to look like an empty container.
+
+Drawing nothing is indistinguishable from a rendering failure, and it hid real
+logic: two_sum's first `target - num in d` searches an empty dict, so the miss
+that sets up the whole algorithm drew nothing at all.
+"""
+
+from stubs import drain, settle
+from visual_trace.data_structures.dict import Dict
+from visual_trace.data_structures.list import List
+
+
+def placeholder_opacity(structure) -> float:
+    return round(float(structure.mobject.placeholder[0].get_stroke_opacity()), 2)
+
+
+def test_an_empty_dict_draws_something():
+    d = Dict()
+    assert d.mobject.family_members_with_points(), "an empty dict drew nothing"
+    assert placeholder_opacity(d) > 0
+
+
+def test_an_empty_list_draws_something():
+    nums = List()
+    assert nums.mobject.family_members_with_points(), "an empty list drew nothing"
+    assert placeholder_opacity(nums) > 0
+
+
+def test_a_populated_dict_shows_no_placeholder():
+    d = Dict(a=1)
+    drain(d)
+    settle(d)
+    assert placeholder_opacity(d) == 0
+
+
+def test_a_populated_list_shows_no_placeholder():
+    nums = List(1, 2)
+    drain(nums)
+    settle(nums)
+    assert placeholder_opacity(nums) == 0
+
+
+def test_the_first_entry_hides_the_placeholder():
+    d = Dict()
+    settle(d)
+    d["a"] = 1
+    drain(d)
+    settle(d)
+    assert placeholder_opacity(d) == 0
+
+
+def test_the_first_append_hides_the_placeholder():
+    nums = List()
+    settle(nums)
+    nums.append(1)
+    drain(nums)
+    settle(nums)
+    assert placeholder_opacity(nums) == 0
+
+
+def test_clearing_brings_the_placeholder_back():
+    d = Dict(a=1)
+    drain(d)
+    settle(d)
+    d.clear()
+    drain(d)
+    settle(d)
+    assert placeholder_opacity(d) > 0
+
+
+def test_deleting_the_last_entry_brings_the_placeholder_back():
+    d = Dict(a=1)
+    drain(d)
+    settle(d)
+    del d["a"]
+    drain(d)
+    settle(d)
+    assert placeholder_opacity(d) > 0
+
+
+def container_width(structure) -> float:
+    return round(float(structure.mobject.width), 3)
+
+
+def test_the_dict_placeholder_overlaps_the_first_cell():
+    """Filling an empty container must not move or widen it.
+
+    The placeholder stands exactly where the first cell will be drawn, so the
+    transition is a crossfade rather than a reflow.
+    """
+    d = Dict()
+    drain(d)
+    settle(d)
+    empty = container_width(d)
+    d["a"] = 1
+    drain(d)
+    settle(d)
+    assert container_width(d) == empty, "the dict changed width when first filled"
+
+
+def test_the_list_placeholder_overlaps_the_first_cell():
+    nums = List()
+    drain(nums)
+    settle(nums)
+    empty = container_width(nums)
+    nums.append(1)
+    drain(nums)
+    settle(nums)
+    assert container_width(nums) == empty, "the list changed width when first filled"

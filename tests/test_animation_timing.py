@@ -59,7 +59,12 @@ class RecordingScene(SceneGraph):
             {
                 "before": before,
                 "after": float(self.highlight.get_center()[1]),
-                "kinds": [type(a).__name__ for a in prepared],
+                "moves_highlight": any(
+                    getattr(a, "mobject", None) is self.highlight for a in prepared
+                ),
+                "draws_content": any(
+                    getattr(a, "mobject", None) is not self.highlight for a in prepared
+                ),
             }
         )
 
@@ -89,7 +94,7 @@ def appends_then_returns(nums):
 def test_content_animates_while_its_own_line_is_highlighted():
     """The square for `nums.append(1)` must appear while line 1 is highlighted."""
     scene = drive(appends_then_returns, List())
-    content = [p for p in scene.plays if any("Method" not in k for k in p["kinds"])]
+    content = [p for p in scene.plays if p["draws_content"]]
     assert content, f"no content animation was ever played; plays={scene.plays}"
 
     expected = float(row_center(scene.code, 1)[1])
@@ -110,11 +115,7 @@ def test_content_animates_while_its_own_line_is_highlighted():
 def test_highlight_moves_separately_from_content():
     """A play must not both move the highlight and animate content."""
     scene = drive(appends_then_returns, List())
-    mixed = [
-        p for p in scene.plays
-        if any("Method" in k for k in p["kinds"])
-        and any("Method" not in k for k in p["kinds"])
-    ]
+    mixed = [p for p in scene.plays if p["moves_highlight"] and p["draws_content"]]
     assert not mixed, f"plays mixing highlight movement with content: {mixed}"
 
 

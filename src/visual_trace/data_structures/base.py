@@ -3,6 +3,9 @@ from typing import Any, Callable
 import manim as mn
 
 
+PLACEHOLDER_OPACITY = 0.35
+
+
 class Animated:
     """A data structure that narrates itself as it is used.
 
@@ -32,10 +35,46 @@ class Animated:
 
     def __init__(self, mobject: mn.Mobject, *args: Any, **kwargs: Any):
         self.mobject = mobject
+        # Cells live in their own group so that anything else parented to the
+        # mobject -- the empty-state placeholder -- is not mistaken for one.
+        self.mobject.items = mn.VGroup()
+        self.mobject.add(self.mobject.items)
         self.animation_queue: list = []
         self.pending_operations: list[Callable[[], None]] = []
         # Kept so the scene can rebuild the structure between tracing passes.
         self._initial_arguments = (args, kwargs)
+
+    def _init_placeholder(self, rows: int) -> None:
+        """Give the container an outline to occupy while it is empty.
+
+        Drawing nothing for an empty container is indistinguishable from a
+        rendering failure, and it hides real logic -- searching an empty dict
+        would otherwise animate nothing at all. The outline is sized to overlap
+        the first real cell exactly, so showing and hiding it never moves the
+        container's bounds.
+        """
+        squares = [
+            mn.Square(
+                side_length=0.5,
+                stroke_opacity=PLACEHOLDER_OPACITY,
+                fill_opacity=0.0,
+            )
+            for _ in range(rows)
+        ]
+        for upper, lower in zip(squares, squares[1:]):
+            upper.next_to(lower, mn.UP, buff=0)
+
+        self.mobject.placeholder = mn.VGroup(*squares)
+        self.mobject.add(self.mobject.placeholder)
+        if len(self):
+            self.mobject.placeholder.set_stroke(opacity=0.0)
+
+    def _show_placeholder(self, visible: bool) -> None:
+        """Queue the fade between empty and occupied."""
+        target = PLACEHOLDER_OPACITY if visible else 0.0
+        self.animation_queue.append(
+            self.mobject.placeholder.animate.set_stroke(opacity=target)
+        )
 
     def reset(self):
         """Return a fresh instance with the same initial arguments.

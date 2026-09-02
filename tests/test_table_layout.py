@@ -20,7 +20,7 @@ from stubs import (
 )
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
-from visual_trace.utils.table import create_table, refresh_table
+from visual_trace.utils.table import create_table, create_table111, refresh_table
 
 
 def test_list_materialises_in_its_row():
@@ -39,7 +39,7 @@ def test_dict_materialises_in_its_row():
 def test_list_draws_one_cell_per_element():
     nums = List(2, 7, 11, 15)
     render_step({"target": 9, "nums": nums})
-    assert len(nums.mobject) == len(nums)
+    assert len(nums.mobject.items) == len(nums)
 
 
 def test_emptied_cell_leaves_no_phantom_row_geometry():
@@ -87,9 +87,26 @@ def test_cells_stay_contiguous_across_steps():
     nums.append(3)
     render_step({"target": 9, "nums": nums})
 
-    cells = list(nums.mobject)
+    cells = list(nums.mobject.items)
     gaps = [
         float(right.get_corner(mn.UL)[0]) - float(left.get_corner(mn.DR)[0])
         for left, right in zip(cells, cells[1:])
     ]
     assert all(abs(gap) <= TOL for gap in gaps), f"cells are not contiguous: {gaps}"
+
+
+def test_the_return_value_gets_its_own_row():
+    """Reserved from the first frame so the row set never shifts."""
+    scene = StubScene({"total": None, "return": None})
+    table = create_table111({"total": 19, "return": "(0, 1)"}, scene)
+    rows = table.get_rows()
+    # `.text` is the glyph string, with spaces stripped; `original_text` is
+    # what was actually asked for and what gets rendered.
+    assert rows[-1][0].original_text == "return"
+    assert rows[-1][1].original_text == "(0, 1)"
+
+
+def test_the_return_row_reads_undefined_until_the_function_returns():
+    scene = StubScene({"total": None, "return": None})
+    table = create_table111({"total": 19}, scene)
+    assert table.get_rows()[-1][1].original_text == "Undefined"

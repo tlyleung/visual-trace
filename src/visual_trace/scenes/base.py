@@ -7,7 +7,7 @@ from ..data_structures.base import Animated
 from ..utils.highlight import create_highlight
 from ..utils.table import create_table
 from ..utils.trace_log import open_log
-from ..utils.tracing import flush, start_tracing
+from ..utils.tracing import RETURN_ROW, flush, start_tracing
 
 
 class Animation(mn.Scene):
@@ -57,6 +57,9 @@ class Animation(mn.Scene):
         # Create variables table using first trace
         self.trace_pass = 1
         _, self.variables = start_tracing(self, self.func, *self.args, **self.kwargs)
+        # Reserved from the first frame so the row set never shifts, and the
+        # answer has somewhere to land when the function finally returns.
+        self.variables[RETURN_ROW] = None
         self.table = create_table(self)
         self.add(self.table)
 
@@ -67,8 +70,8 @@ class Animation(mn.Scene):
 
         # Animate using second trace
         self.trace_pass = 2
-        start_tracing(self, self.func, *self.args, **self.kwargs)
-        flush(self)
+        result, _ = start_tracing(self, self.func, *self.args, **self.kwargs)
+        flush(self, result)
         self.wait()
 
         if self.trace_log is not None:
