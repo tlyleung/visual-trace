@@ -33,9 +33,18 @@ cell just because you indexed it. `utils/table.py:create_table111` drains those
 queues into the scene each step. The animation is not scripted; it falls out of
 the algorithm's own data access pattern.
 
-`pending_operations` is the subtle part: the *animation* is queued for this step,
-but the mobject-tree mutation (`self.mobject.add(item)`) is deferred until after
-`scene.play()` returns, so the tree does not change mid-animation.
+`pending_operations` is the subtle part. `List.append` queues the *animation*
+immediately but defers the mobject-tree mutation (`self.mobject.add(item)`);
+`create_table111` applies those deferred operations before it lays the table out,
+because a structure whose group is still empty at layout time gets arranged as
+nothing and its contents then materialise at the origin. `Dict` mutates its
+mobject inline instead — the two classes still disagree on this contract.
+
+**Each traced step plays twice.** `sys.settrace` fires a `line` event *before*
+the line runs, so a line's animations only reach the tracer at the following
+event. The tracer therefore draws the previous line's effects while the highlight
+is still on that line, and only then advances the highlight. Doing both in one
+`play` credits the effect to the wrong line.
 
 ## Verifying changes
 
@@ -110,6 +119,10 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
 - **Instrumentation is env-gated and must stay inert.** `VISUAL_TRACE_LOG` turns
   on the log and probe. Without it, renders are byte-identical — verified by MD5
   against a pre-instrumentation render. Keep it that way.
+- **A step owns one or two partials, not one.** It plays once to draw the
+  previous line's effects and once to move the highlight, and skips the first
+  when there is nothing to draw. The trace log's `plays` field carries the count;
+  `verify.py` walks the partials in order against it rather than assuming.
 - **Never glob the partial-movie directory.** Partials are hash-named and cached,
   so it accumulates stale files from every previous render — there are ~99 in
   `media/videos/480p15/` against a 6-entry list. Parse
@@ -136,13 +149,9 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
 
 ### Known-failing invariants
 
-These fail on `master` today. They are pre-existing bugs, not regressions — treat
-them as the background, and watch for *changes* to this list.
-
-- **One-step animation lag** (no invariant yet). `create_table111` reads
-  `frame.f_locals` at the *start* of a line, so an append on line N is not drawn
-  until step N+1. Visible in the log as `queued` attributed to the wrong line, and
-  in the sheet as `nums` showing `[-1,0]` while `nums.append(1)` is highlighted.
+None. All twelve are green on both examples — so any failure is a regression you
+just introduced, not background noise. Keep it that way: if you add an invariant
+that cannot pass yet, record it here with the reason.
 
 Other latent bugs, unrelated to rendering: `tracing.py` stores
 `variables[variable] = type(variable)` — the type of the *name string*, always

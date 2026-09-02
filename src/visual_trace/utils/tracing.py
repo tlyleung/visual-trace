@@ -11,7 +11,12 @@ from .trace_log import safe_repr
 
 
 def record_step(
-    scene: mn.Scene, frame: FrameType, lineno: int, queued: int, applied: int
+    scene: mn.Scene,
+    frame: FrameType,
+    lineno: int,
+    content: int,
+    applied: int,
+    plays: int,
 ) -> None:
     """Log and probe a settled step. No-op outside the animating pass."""
     if getattr(scene, "trace_pass", 0) != 2:
@@ -34,11 +39,12 @@ def record_step(
         "abs_lineno": frame.f_lineno,
         "src": source,
         "locals": {k: safe_repr(v) for k, v in frame.f_locals.items()},
-        "queued": queued,
+        "content": content,
         "applied": applied,
-        # Only a step that queued animations produces a partial movie file, so
-        # frame extraction needs this to line steps up with the files on disk.
-        "played": queued > 0,
+        # Each play() writes one partial movie file, and a step makes one or
+        # two, so frame extraction needs the count to line steps up with the
+        # files on disk.
+        "plays": plays,
     }
     record.update(probe_step(scene, lineno, frame.f_locals))
     log.emit(**record)
@@ -62,31 +68,39 @@ def trace_func(
             for variable, _ in frame.f_locals.items():
                 variables[variable] = type(variable)
 
+            plays = 0
+            content = 0
+            applied = 0
+
             # Second pass: animate code highlight and variables table
             if hasattr(scene, "table"):
-                # Animate code highlight
-                animation = scene.highlight.animate.move_to(
-                    row_center(scene.code, lineno)
-                )
-                scene.animation_queue.append(animation)
-
-                # Animate variables table
+                # Refresh the table, harvesting whatever the previous line
+                # queued as it executed. Tree mutations are already applied by
+                # create_table111, which must run them before laying out.
                 old_table = scene.table
                 new_table = create_table111(frame.f_locals, scene)
                 old_table.become(new_table)
+                applied = getattr(scene, "applied_operations", 0)
 
-            # What this step queued, captured before the queue drains below.
-            # Tree mutations are already applied by create_table111, which has
-            # to run them before it lays the mobjects out.
-            queued = len(scene.animation_queue)
-            applied = getattr(scene, "applied_operations", 0)
-
-            # Play animation
-            if scene.animation_queue:
-                scene.play(*scene.animation_queue)
+                queued = list(scene.animation_queue)
                 scene.animation_queue.clear()
+                content = len(queued)
 
-            record_step(scene, frame, lineno, queued, applied)
+                # The trace fires *before* a line runs, so a line's animations
+                # only reach us at the next event. Play them while the highlight
+                # is still on the line that caused them, and only then advance
+                # it. Moving and drawing together would credit the effect to the
+                # following line.
+                if queued:
+                    scene.play(*queued)
+                    plays += 1
+
+                scene.play(
+                    scene.highlight.animate.move_to(row_center(scene.code, lineno))
+                )
+                plays += 1
+
+            record_step(scene, frame, lineno, content, applied, plays)
 
     return lambda *args, **kwargs: trace_func(
         *args, **kwargs, func=func, scene=scene, variables=variables

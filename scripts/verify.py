@@ -173,11 +173,11 @@ def load_trace(out_dir: Path) -> list[dict]:
 
 def report(records: list[dict]) -> int:
     failures = 0
-    print(f"\n{'step':>4} {'line':>4} {'q/p':>6}  source")
+    print(f"\n{'step':>4} {'line':>4} {'c/a':>6}  source")
     print("-" * 78)
     for rec in records:
         print(f"{rec['step']:>4} {rec['lineno']:>4} "
-              f"{rec['queued']:>2}/{rec['applied']:<3}  {rec['src'].strip()[:56]}")
+              f"{rec['content']:>2}/{rec['applied']:<3}  {rec['src'].strip()[:56]}")
         for check in rec.get("checks", []):
             if check["ok"] is True:
                 continue
@@ -259,12 +259,22 @@ def main() -> int:
 
     # A step that queued nothing never reaches scene.play() and so produces no
     # partial file; only played steps consume one, in order.
-    played = [r for r in records if r["played"]]
+    # A step plays once to draw the previous line's effects and once to move
+    # the highlight, so it owns one or two partials. Walk them in order rather
+    # than assuming one apiece.
+    played = []
+    offset = 0
+    for rec in records:
+        count = rec.get("plays", 0)
+        if count:
+            played.append((rec, movies[offset:offset + count]))
+            offset += count
+    expected = sum(r.get("plays", 0) for r in records)
     wanted = parse_steps(args.steps, len(played))
     print(f"\n{len(records)} steps ({len(played)} animated), "
-          f"{len(movies)} partial movie files")
-    if len(movies) < len(played):
-        print("warning: fewer partial files than animated steps -- mapping is suspect")
+          f"{expected} plays, {len(movies)} partial movie files")
+    if len(movies) < expected:
+        print("warning: fewer partial files than recorded plays -- mapping is suspect")
 
     raw_dir = out_dir / "raw"
     tiles_dir = out_dir / "frames"
@@ -272,10 +282,12 @@ def main() -> int:
     settled: list[Path] = []
     tiles: list[Path] = []
 
-    for i, rec in enumerate(played):
-        if i >= len(movies):
+    for i, (rec, step_movies) in enumerate(played):
+        if not step_movies:
             break
-        frames = extract_frames(movies[i], raw_dir / f"{i:03d}")
+        frames = []
+        for j, movie in enumerate(step_movies):
+            frames.extend(extract_frames(movie, raw_dir / f"{i:03d}_{j}"))
         # Every step contributes its settled frame, so baselines and diffs stay
         # comparable even when --steps narrows what gets drawn onto the sheet.
         settled.append(frames[-1])
@@ -299,7 +311,8 @@ def main() -> int:
         if not (0 <= k < len(played)):
             print(f"error: --step {k} out of range (0..{len(played) - 1})")
         else:
-            frames = sorted((raw_dir / f"{k:03d}").glob("f_*.png"))
+            frames = [f for d in sorted(raw_dir.glob(f"{k:03d}_*"))
+                      for f in sorted(d.glob("f_*.png"))]
             strip = []
             for j, frame in enumerate(frames):
                 tile = tiles_dir / f"strip_{j:03d}.png"
