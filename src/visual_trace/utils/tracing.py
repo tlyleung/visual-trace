@@ -126,8 +126,8 @@ def trace_func(
         function_name = code.co_name
         if function_name == func.__name__:
             # First pass: save variables
-            for variable, _ in frame.f_locals.items():
-                variables[variable] = type(variable)
+            for variable, value in frame.f_locals.items():
+                variables[variable] = type(value)
 
             # Kept so the run can be flushed once the function has returned.
             scene.last_locals = dict(frame.f_locals)
@@ -160,6 +160,10 @@ def start_tracing(
 ) -> tuple[Any, dict[str, type]]:
     variables = dict[Any, type]()
     sys.settrace(trace_func(None, None, None, func, scene, variables))
-    result = func(*args, **kwargs)
-    sys.settrace(None)
+    try:
+        result = func(*args, **kwargs)
+    finally:
+        # sys.settrace is process-global: a hook left installed by a raising
+        # traced function outlives the render and line-traces everything after.
+        sys.settrace(None)
     return result, variables

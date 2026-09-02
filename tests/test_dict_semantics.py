@@ -81,3 +81,12 @@ def test_dict_can_reset_between_tracing_passes():
     assert fresh is not d
     fresh["c"] = 3
     assert "c" not in d
+
+
+def test_deleting_a_missing_key_raises_key_error():
+    """Traced code guarding with `except KeyError` must not crash the render."""
+    import pytest
+
+    d = Dict(a=1)
+    with pytest.raises(KeyError):
+        del d["zzz"]

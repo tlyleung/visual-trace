@@ -114,6 +114,8 @@ class Dict(Animated, dict):
             self.__draw(key, value)
 
     def __delitem__(self, key):
+        if not dict.__contains__(self, key):
+            raise KeyError(key)
         index = self.__index_of(key)
         dict.__delitem__(self, key)
         self.__remove(index)
@@ -154,8 +156,10 @@ class Dict(Animated, dict):
         for cell in cells:
             self.queue(mn.FadeOut(cell))
         if cells:
-            # Detach only once the fade has played. Emptying now would have the
-            # table lay out nothing while the cells are still on screen.
+            # Detached by `apply_pending`, which the table runs just before it
+            # lays out -- late enough that the cells are still parented while
+            # the fade is being built, early enough that the layout sees the
+            # container empty.
             self.pending_operations.append(
                 lambda: self.mobject.items.remove(*cells)
             )

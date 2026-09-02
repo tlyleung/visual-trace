@@ -133,3 +133,27 @@ def test_the_first_cell_lands_where_the_placeholder_stood():
         assert filled == empty, (
             f"{name} changed size when filled after a layout: {empty} -> {filled}"
         )
+
+
+def test_a_three_row_placeholder_stacks_without_overlapping():
+    """`_init_placeholder(rows=n)` is the extension point for new structures.
+
+    Stacking forwards moves each square against an anchor that has not been
+    placed yet, so from three rows up they pile onto each other.
+    """
+    import manim as mn
+
+    from visual_trace.data_structures.base import Animated
+
+    class ThreeRow(Animated, list):
+        def __init__(self):
+            list.__init__(self, [])
+            Animated.__init__(self, mn.VGroup())
+            self._init_placeholder(rows=3)
+
+    squares = list(ThreeRow().mobject.placeholder)
+    centres = [round(float(square.get_center()[1]), 3) for square in squares]
+    assert len(set(centres)) == 3, f"squares share a position: {centres}"
+    gaps = [round(centres[i] - centres[i + 1], 3) for i in range(len(centres) - 1)]
+    assert gaps == [0.5, 0.5], f"squares are not stacked contiguously: {gaps}"
+    assert centres[-1] == 0.0, "the bottom square should sit on the origin"

@@ -121,7 +121,11 @@ class Animated:
             )
             for _ in range(rows)
         ]
-        for upper, lower in zip(squares, squares[1:]):
+        # Bottom-up: `next_to` moves the upper square against the lower one, so
+        # the lower must already be placed. Going forwards leaves the top rows
+        # anchored to squares that move afterwards, and from three rows up they
+        # pile onto each other.
+        for upper, lower in reversed(list(zip(squares, squares[1:]))):
             upper.next_to(lower, mn.UP, buff=0)
 
         self.mobject.placeholder = mn.VGroup(*squares)

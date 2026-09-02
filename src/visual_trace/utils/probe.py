@@ -209,10 +209,10 @@ def panels_disjoint(scene, lineno, local_vars) -> list[dict]:
 def structures_inside_table(scene, lineno, local_vars) -> list[dict]:
     """Animated structures are table cells, so they must sit inside the table.
 
-    ``create_table111`` puts ``v.mobject`` into a freshly built table and then
-    ``become``s the old one onto it. ``become`` copies points, but the mobject
-    itself stays parented to the discarded table -- so it can be left at its
-    construction position near the origin instead of in its cell.
+    A structure whose group is empty when the table lays out gets arranged as
+    nothing, and its contents then materialise at the world origin rather than in
+    the cell they were assigned -- which is why `create_table111` applies the
+    deferred tree mutations before it builds the table.
     """
     checks = []
     tl, tr = x_range(scene.table)

@@ -49,12 +49,12 @@ guessing at attributes. Read its docstring before adding one — the positioning
 rule in there is not obvious and a single-step test will not catch getting it
 wrong.
 
-`pending_operations` is the subtle part. `List.append` queues the *animation*
-immediately but defers the mobject-tree mutation (`self.mobject.add(item)`);
-`create_table111` applies those deferred operations before it lays the table out,
-because a structure whose group is still empty at layout time gets arranged as
-nothing and its contents then materialise at the origin. `Dict` mutates its
-mobject inline instead — the two classes still disagree on this contract.
+`pending_operations` is the subtle part. Additions go into `mobject.items`
+inline, because a structure whose group is still empty when the table lays out
+gets arranged as nothing and its contents then materialise at the origin. Only
+*removals* are deferred: a cell has to stay parented long enough for its fade to
+be built against it. `create_table111` runs the deferred work immediately before
+laying out.
 
 `refresh_table` swaps the whole table mobject in rather than `become`-ing the old
 one onto the new. `become` aligns families by padding, which strands zero-area

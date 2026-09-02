@@ -56,6 +56,11 @@ def render(script_path: Path, out_dir: Path, width: int, height: int, fps: int):
     mn.config.pixel_width = width
     mn.config.pixel_height = height
     mn.config.frame_rate = fps
+    # Manim's finish() deletes the oldest partial movie files once the
+    # directory passes max_files_cached (default 100). Frame extraction
+    # reads every path in the list file, so eviction would break a long
+    # render after it had already been paid for.
+    mn.config.max_files_cached = -1
     mn.config.media_dir = str(out_dir / "manim")
     mn.config.output_file = script_path.stem
 
