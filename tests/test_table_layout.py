@@ -4,63 +4,23 @@
 costs ~8s a run. These cover the same ground in milliseconds, so a fix can be
 driven test-first rather than verified afterwards.
 
-Assertions are made against each value's own **row label**, never against the
-table's bounds. The value is a child of the table, so anything derived from the
-table's geometry is inflated by the value itself and passes vacuously. The label
-is positioned by the same layout but is unaffected by what the value does later.
-For the same reason every case uses at least two rows: in a single-row table the
-row sits at y=0, which is exactly where a mislaid mobject lands, so the bug hides.
+Every case uses at least two rows: in a single-row table the row sits at y=0,
+which is exactly where a mislaid mobject lands, so the bug hides.
 """
 
 import manim as mn
 
+from stubs import (
+    TOL,
+    StubScene,
+    assert_in_row,
+    drain,
+    render_step,
+    row_label,
+)
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
-from stubs import SceneGraph, right_column
-from visual_trace.utils.table import create_table, create_table111, refresh_table
-
-TOL = 0.02
-
-
-class StubScene(SceneGraph):
-    """The slice of `Animation` that `create_table111` actually touches."""
-
-    def __init__(self, variables: dict):
-        super().__init__()
-        self.variables = variables
-        self.animation_queue = []
-        self.right_col = right_column()
-
-
-def render_step(local_vars: dict):
-    """One traced step. `create_table111` applies deferred work itself."""
-    scene = StubScene(dict.fromkeys(local_vars))
-    table = create_table111(local_vars, scene)
-    return scene, table
-
-
-def row_label(table: mn.MobjectTable, index: int):
-    return table.get_rows()[index][0]
-
-
-def assert_drawn(mobject, name: str) -> None:
-    assert mobject.family_members_with_points(), f"{name} drew nothing at all"
-
-
-def assert_in_row(value, label, name: str) -> None:
-    """The value must sit on its label's row, and to the right of it."""
-    assert_drawn(value, name)
-    label_y = float(label.get_center()[1])
-    value_y = float(value.get_center()[1])
-    assert abs(label_y - value_y) <= TOL, (
-        f"{name} sits at y={value_y:.3f} but its row label is at y={label_y:.3f}"
-    )
-    label_right = float(label.get_corner(mn.DR)[0])
-    value_left = float(value.get_corner(mn.UL)[0])
-    assert value_left >= label_right - TOL, (
-        f"{name} starts at x={value_left:.3f}, left of its label's "
-        f"right edge at x={label_right:.3f}"
-    )
+from visual_trace.utils.table import create_table, refresh_table
 
 
 def test_list_materialises_in_its_row():
@@ -80,12 +40,6 @@ def test_list_draws_one_cell_per_element():
     nums = List(2, 7, 11, 15)
     render_step({"target": 9, "nums": nums})
     assert len(nums.mobject) == len(nums)
-
-
-def drain(structure) -> None:
-    for operation in structure.pending_operations:
-        operation()
-    structure.pending_operations.clear()
 
 
 def test_emptied_cell_leaves_no_phantom_row_geometry():
@@ -119,3 +73,23 @@ def test_emptied_cell_leaves_no_phantom_row_geometry():
             f"rows {index} and {index + 1} overlap by {overlap:.3f} after a "
             f"cell emptied"
         )
+
+
+def test_cells_stay_contiguous_across_steps():
+    """A cell appended after the group is already placed must sit flush.
+
+    Single-step tests cannot see this: the group starts at the origin, so
+    absolute and relative positioning agree. Once the table has moved the group
+    into its cell they diverge.
+    """
+    nums = List(1, 2)
+    render_step({"target": 9, "nums": nums})
+    nums.append(3)
+    render_step({"target": 9, "nums": nums})
+
+    cells = list(nums.mobject)
+    gaps = [
+        float(right.get_corner(mn.UL)[0]) - float(left.get_corner(mn.DR)[0])
+        for left, right in zip(cells, cells[1:])
+    ]
+    assert all(abs(gap) <= TOL for gap in gaps), f"cells are not contiguous: {gaps}"

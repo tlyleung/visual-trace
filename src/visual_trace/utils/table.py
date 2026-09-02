@@ -1,5 +1,7 @@
 import manim as mn
 
+from ..data_structures.base import Animated
+
 
 def create_table(scene: mn.Scene) -> mn.MobjectTable:
     table = mn.MobjectTable(
@@ -14,33 +16,6 @@ def create_table(scene: mn.Scene) -> mn.MobjectTable:
     return table
 
 
-def update_table(local_vars: dict, scene: mn.Scene) -> list[mn.Animation]:
-    for row in scene.table.get_rows():
-        name = row[0].get_text()
-        old_cell = row[1]
-        if name in local_vars:
-            v = local_vars[name]
-
-            if hasattr(v, "mobject"):
-                new_cell = v.mobject
-
-                if hasattr(v, "animation_queue"):
-                    scene.animation_queue.extend(v.animation_queue)
-                    v.animation_queue.clear()
-
-
-            else:
-                new_cell = mn.Text(str(v), font_size=24)
-
-        else:
-            new_cell = mn.Text("Undefined", font_size=24)
-
-        # Only swap in the new cell if it is different from the old one
-        if new_cell is not old_cell:
-            new_cell.move_to(old_cell, mn.LEFT)
-            old_cell.become(new_cell)
-
-
 def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
     data = []
     applied = 0
@@ -48,21 +23,13 @@ def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
         if name in local_vars:
             v = local_vars[name]
 
-            if hasattr(v, "mobject"):
-                if hasattr(v, "animation_queue"):
-                    scene.animation_queue.extend(v.animation_queue)
-                    v.animation_queue.clear()
-
+            if isinstance(v, Animated):
+                scene.animation_queue.extend(v.drain_animations())
                 # Apply deferred tree mutations before the table lays the
                 # mobject out. Carrying them past this point means the table
                 # arranges an empty group, and the contents then materialise at
                 # the origin instead of in the cell they were assigned.
-                if hasattr(v, "pending_operations"):
-                    for operation in v.pending_operations:
-                        operation()
-                    applied += len(v.pending_operations)
-                    v.pending_operations.clear()
-
+                applied += v.apply_pending()
                 mobject = v.mobject
 
             else:

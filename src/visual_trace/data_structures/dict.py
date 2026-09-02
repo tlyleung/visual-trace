@@ -1,7 +1,9 @@
 import manim as mn
 
+from .base import Animated
 
-class Dict(dict):
+
+class Dict(Animated, dict):
     """
     A dict containing mobjects that can be animated by consuming the animation queue.
     """
@@ -9,21 +11,15 @@ class Dict(dict):
     FADE_TIME = 0.2
 
     def __init__(self, **kwargs):
-        super().__init__(kwargs)
-        self.kwargs = kwargs
-        self.mobject = mn.VMobject()
-        self.mobject.items = mn.VGroup()
+        dict.__init__(self, kwargs)
+        mobject = mn.VMobject()
+        mobject.items = mn.VGroup()
+        Animated.__init__(self, mobject, **kwargs)
 
-        self.animation_queue = []
-        self.pending_operations = []
         for key, value in kwargs.items():
             self.animation_queue.extend(self.__append_animation(key, value))
 
         self.mobject.add(self.mobject.items)
-
-    def reset(self):
-        """Return a fresh instance with the same initial arguments."""
-        return type(self)(**self.kwargs)
 
     def __append_animation(self, key, value):
         key_square = mn.Square(side_length=0.5, fill_color=mn.WHITE, fill_opacity=0.0)

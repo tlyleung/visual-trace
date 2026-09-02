@@ -13,6 +13,8 @@ from typing import Any
 
 import manim as mn
 
+from ..data_structures.base import Animated
+
 TOL = 0.02
 
 
@@ -55,13 +57,13 @@ def _tracked_lists(local_vars: dict) -> list[tuple[str, Any]]:
     return [
         (n, v)
         for n, v in local_vars.items()
-        if isinstance(v, list) and hasattr(v, "mobject")
+        if isinstance(v, Animated) and isinstance(v, list)
     ]
 
 
 def _tracked_structures(local_vars: dict) -> list[tuple[str, Any]]:
-    """Any animated data structure, list or dict."""
-    return [(n, v) for n, v in local_vars.items() if hasattr(v, "mobject")]
+    """Any animated data structure, whatever container it wraps."""
+    return [(n, v) for n, v in local_vars.items() if isinstance(v, Animated)]
 
 
 def _drawn(value) -> bool:

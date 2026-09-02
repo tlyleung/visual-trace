@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 import manim as mn
 
+from ..data_structures.base import Animated
 from ..utils.highlight import create_highlight
 from ..utils.table import create_table
 from ..utils.trace_log import open_log
@@ -61,7 +62,7 @@ class Animation(mn.Scene):
 
         # Reset data structures between traces
         self.args = tuple(
-            arg.reset() if hasattr(arg, "reset") else arg for arg in self.args
+            arg.reset() if isinstance(arg, Animated) else arg for arg in self.args
         )
 
         # Animate using second trace

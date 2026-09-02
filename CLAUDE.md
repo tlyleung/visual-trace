@@ -26,12 +26,19 @@ one function serves as both the global and per-frame trace. On each `line` event
 inside the target it moves the highlight, rebuilds the table, plays the queued
 animations, then drains `pending_operations`.
 
-The interesting design: `data_structures/List` and `Dict` subclass `list`/`dict`
-and carry a `.mobject` plus an `.animation_queue`. Overridden methods push Manim
-animations as a **side effect** of ordinary use — `Dict.__getitem__` highlights a
-cell just because you indexed it. `utils/table.py:create_table111` drains those
-queues into the scene each step. The animation is not scripted; it falls out of
-the algorithm's own data access pattern.
+The interesting design: `data_structures/List` and `Dict` pair a builtin
+container with a Manim mobject and override its methods so ordinary use has a
+visual side effect — `Dict.__getitem__` highlights a cell just because you indexed
+it. `utils/table.py:create_table111` drains those queues into the scene each step.
+The animation is not scripted; it falls out of the algorithm's own data access
+pattern.
+
+`data_structures/base.py:Animated` is the contract they share, and is what a new
+structure (Stack, Queue, Tree, Graph) should be built on. It owns `mobject`, the
+two queues, and `reset()`; the scene tests `isinstance(v, Animated)` rather than
+guessing at attributes. Read its docstring before adding one — the positioning
+rule in there is not obvious and a single-step test will not catch getting it
+wrong.
 
 `pending_operations` is the subtle part. `List.append` queues the *animation*
 immediately but defers the mobject-tree mutation (`self.mobject.add(item)`);
@@ -171,6 +178,6 @@ failures.
 Other latent bugs, unrelated to rendering: `tracing.py` stores
 `variables[variable] = type(variable)` — the type of the *name string*, always
 `str`; only the keys are used downstream, so it is harmless but misleading.
-`utils/table.py:update_table` is dead code superseded by `create_table111`, and
 `utils/transform.py` is an entirely commented-out AST approach that would have
-rewritten `list` -> `List` automatically.
+rewritten `list` -> `List` automatically, and `create_table111` still carries its
+placeholder name.
