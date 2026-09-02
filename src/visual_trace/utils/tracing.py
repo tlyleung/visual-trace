@@ -4,7 +4,7 @@ from typing import Any, Callable
 
 import manim as mn
 
-from .highlight import HIGHLIGHT_OFFSET
+from .highlight import row_center
 from .probe import probe_step
 from .table import create_table111
 from .trace_log import safe_repr
@@ -65,10 +65,9 @@ def trace_func(
             # Second pass: animate code highlight and variables table
             if hasattr(scene, "table"):
                 # Animate code highlight
-                line = scene.code.code_lines[lineno]
-                center = scene.highlight.get_center()
-                center[1] = line.get_center()[1]
-                animation = scene.highlight.animate.move_to(center + HIGHLIGHT_OFFSET)
+                animation = scene.highlight.animate.move_to(
+                    row_center(scene.code, lineno)
+                )
                 scene.animation_queue.append(animation)
 
                 # Animate variables table

@@ -74,23 +74,54 @@ def _drawn(value) -> bool:
 #
 
 
-def highlight_covers_line(scene, lineno, local_vars) -> list[dict]:
-    """The highlight must vertically contain the line it is pointing at.
+def highlight_on_row(scene, lineno, local_vars) -> list[dict]:
+    """The band must sit on the executing row, and on no other.
 
-    Its height is fixed at construction from a single line (``create_highlight``
-    is called with line 1), but rendered code lines differ in height, so a taller
-    line can poke out of the band.
+    Checked against the rendered line-number glyphs rather than against the
+    positioning helper, so the invariant cannot be satisfied by agreeing with a
+    bug in that helper. Line numbers are also the only per-row geometry that is
+    trustworthy -- see `utils/highlight.row_center` for why `code_lines` is not.
     """
-    line = scene.code.code_lines[lineno]
+    numbers = scene.code.line_numbers
     hb, ht = _y_range(scene.highlight)
-    lb, lt = _y_range(line)
-    ok = ht >= lt - TOL and hb <= lb + TOL
+    nb, nt = _y_range(numbers[lineno])
+    checks = [
+        _check(
+            "highlight_on_row",
+            ht >= nt - TOL and hb <= nb + TOL,
+            f"band y=[{hb:.3f},{ht:.3f}] vs line number {lineno} y=[{nb:.3f},{nt:.3f}]",
+        )
+    ]
+    for neighbour in (lineno - 1, lineno + 1):
+        if not 0 <= neighbour < len(numbers):
+            continue
+        jb, jt = _y_range(numbers[neighbour])
+        overlap = min(ht, jt) - max(hb, jb)
+        checks.append(
+            _check(
+                "highlight_clears_neighbours",
+                overlap <= TOL,
+                f"band overlaps line number {neighbour} by {overlap:.3f}",
+            )
+        )
+    return checks
+
+
+def highlight_row_height(scene, lineno, local_vars) -> list[dict]:
+    """One row tall. Guards against the band being sized once and never again."""
+    numbers = scene.code.line_numbers
+    if len(numbers) < 2:
+        return []
+    span = abs(
+        float(numbers[-1].get_center()[1]) - float(numbers[0].get_center()[1])
+    )
+    pitch = span / (len(numbers) - 1)
+    height = float(scene.highlight.height)
     return [
         _check(
-            "highlight_covers_line",
-            ok,
-            f"highlight y=[{hb:.3f},{ht:.3f}] h={ht - hb:.3f} vs "
-            f"line[{lineno}] y=[{lb:.3f},{lt:.3f}] h={lt - lb:.3f}",
+            "highlight_row_height",
+            abs(height - pitch) <= TOL,
+            f"band height {height:.3f} vs row pitch {pitch:.3f}",
         )
     ]
 
@@ -259,7 +290,8 @@ def table_row_count(scene, lineno, local_vars) -> list[dict]:
 
 
 INVARIANTS = [
-    highlight_covers_line,
+    highlight_on_row,
+    highlight_row_height,
     structures_inside_table,
     structures_clear_of_code,
     highlight_spans_code_width,

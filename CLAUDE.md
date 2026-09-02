@@ -83,6 +83,12 @@ Everything lands in `media/verify/<example>/`, which is gitignored.
 - **Resolution and frame rate are independent of the `quality` preset.** Verify
   renders at 1920x1080 @ 8fps: the code listing is drawn at `scale(0.5)` and is
   unreadable at 480p. Set `pixel_width`/`pixel_height`/`frame_rate` after `quality`.
+- **Never position anything from `code.code_lines[i]` bounding boxes.** Manim
+  renders leading indentation as zero-size `Dot`s, and when a blank line precedes
+  a row those dots are parked at the *blank* row's y — so the row's box stretches
+  across two rows (0.463 against a 0.253 norm). A blank line's own box collapses to
+  the origin. Use the `code.line_numbers` ladder, which is uniform to 2e-03;
+  `utils/highlight.row_center` does this.
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.
@@ -92,11 +98,6 @@ Everything lands in `media/verify/<example>/`, which is gitignored.
 These fail on `master` today. They are pre-existing bugs, not regressions — treat
 them as the background, and watch for *changes* to this list.
 
-- `highlight_covers_line` — fails every step, both examples. `create_highlight` sizes
-  the band from one line (`base.py` passes line 1) and it never resizes, but rendered
-  line heights vary (0.233–0.463; blank-line-adjacent lines are tallest). Compounded by
-  `HIGHLIGHT_OFFSET` being a constant `DOWN * 0.035`, which sits the band low on
-  every line.
 - `structures_inside_table` — fails at step 0 in both examples. `create_table111`
   puts `v.mobject` into a freshly built table and then `become`s the old one onto
   it; `become` copies points but the mobject stays parented to the discarded
