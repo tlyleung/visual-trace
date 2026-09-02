@@ -31,10 +31,8 @@ class TraceLog:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = self.path.open("w")
-        self.records: list[dict] = []
 
     def emit(self, **record: Any) -> None:
-        self.records.append(record)
         self._fh.write(json.dumps(record, default=str) + "\n")
         self._fh.flush()
 

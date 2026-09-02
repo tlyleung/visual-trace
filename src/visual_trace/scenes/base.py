@@ -7,7 +7,7 @@ from ..data_structures.base import Animated
 from ..utils.highlight import create_highlight
 from ..utils.table import create_table
 from ..utils.trace_log import open_log
-from ..utils.tracing import RETURN_ROW, flush, start_tracing
+from ..utils.tracing import ANIMATING_PASS, RETURN_ROW, flush, start_tracing
 
 
 class Animation(mn.Scene):
@@ -22,7 +22,6 @@ class Animation(mn.Scene):
 
         # Verification instrumentation. Inert unless VISUAL_TRACE_LOG is set.
         self.trace_log = open_log()
-        self.trace_pass = 0
         self.step = 0
 
         # Layout
@@ -69,7 +68,7 @@ class Animation(mn.Scene):
         )
 
         # Animate using second trace
-        self.trace_pass = 2
+        self.trace_pass = ANIMATING_PASS
         result, _ = start_tracing(self, self.func, *self.args, **self.kwargs)
         flush(self, result)
         self.wait()

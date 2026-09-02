@@ -5,17 +5,13 @@ and both were silent, so the array it scans never reacted and the branch the
 algorithm turns on showed nothing.
 """
 
-from stubs import drain, render_step, settle
+from stubs import drain, render_step, settle, square_opacities
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 
 
-def cell_opacities(nums: List) -> list[float]:
-    return [round(float(cell[0].get_fill_opacity()), 2) for cell in nums.mobject.items]
-
-
-def key_opacities(d: Dict) -> list[float]:
-    return [round(float(item[0].get_fill_opacity()), 2) for item in d.mobject.items]
+cell_opacities = square_opacities   # a List cell is (square, label)
+key_opacities = square_opacities     # a Dict cell is (key_square, ..., val_square, ...)
 
 
 def drawn_list() -> List:

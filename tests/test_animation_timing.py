@@ -19,7 +19,7 @@ from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 from visual_trace.utils.highlight import create_highlight, row_center
 from visual_trace.utils.table import create_table
-from visual_trace.utils.tracing import flush, start_tracing
+from visual_trace.utils.tracing import ANIMATING_PASS, flush, start_tracing
 
 
 class RecordingScene(SceneGraph):
@@ -40,7 +40,7 @@ class RecordingScene(SceneGraph):
         self.right_col = right_column()
         self.animation_queue = []
         self.variables = {}
-        self.trace_pass = 2
+        self.trace_pass = 1
         self.step = 0
         self.trace_log = None
         self.plays: list[dict] = []
@@ -78,6 +78,7 @@ def drive(func, *args):
     # its leftover animation queue, exactly as the real scene would.
     args = tuple(a.reset() if hasattr(a, "reset") else a for a in args)
     scene.step = 0
+    scene.trace_pass = ANIMATING_PASS
     scene.plays.clear()
     scene.args_structure = args[0]
     start_tracing(scene, func, *args)

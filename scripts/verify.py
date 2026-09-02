@@ -88,16 +88,24 @@ def partial_movies(scene) -> list[Path]:
 #
 
 
-def extract_frames(movie: Path, dest_dir: Path) -> list[Path]:
-    """Dump every frame of one animation step, in order.
+def extract_frames(movie: Path, dest_dir: Path, every: bool = True) -> list[Path]:
+    """Dump frames of one animation step, in order.
+
+    `every=False` writes only the settled last frame, which is all the default
+    sheet and the baselines ever read -- decoding is unavoidable but encoding
+    eight 1080p PNGs per step when one is wanted is not.
 
     Deliberately not `-sseof`: on the 8-frame clips Manim produces it writes
     nothing and still exits 0, which is precisely the silent failure this tool
-    exists to catch.
+    exists to catch. `reverse` buffers the clip and takes its true last frame.
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
-    sh("ffmpeg", "-y", "-v", "error", "-i", movie, "-vsync", "0",
-       dest_dir / "f_%03d.png")
+    if every:
+        sh("ffmpeg", "-y", "-v", "error", "-i", movie, "-vsync", "0",
+           dest_dir / "f_%03d.png")
+    else:
+        sh("ffmpeg", "-y", "-v", "error", "-i", movie, "-vf", "reverse",
+           "-frames:v", "1", "-update", "1", dest_dir / "f_001.png")
     frames = sorted(dest_dir.glob("f_*.png"))
     if not frames:
         raise RuntimeError(f"no frames extracted from {movie}")
@@ -135,6 +143,27 @@ def auto_tile(count: int) -> str:
     if count <= 2:
         return f"{count}x"
     return "3x" if count > 8 else "2x"
+
+
+def build_sheet(
+    frames: list[Path],
+    labels: list[str],
+    dest: Path,
+    tiles_dir: Path,
+    prefix: str,
+    tile: str | None,
+    tile_width: int,
+    roi: str | None,
+    what: str = "sheet",
+) -> None:
+    """Caption each frame and tile them. Used for both the sheet and filmstrips."""
+    tiles = []
+    for index, (frame, text) in enumerate(zip(frames, labels)):
+        tile_path = tiles_dir / f"{prefix}{index:03d}.png"
+        caption(frame, tile_path, text, tile_width, roi)
+        tiles.append(tile_path)
+    if tiles:
+        montage(tiles, dest, tile, what)
 
 
 def montage(frames: list[Path], dest: Path, tile: str | None, label: str = "sheet") -> None:
@@ -178,7 +207,10 @@ def load_trace(out_dir: Path) -> list[dict]:
 STABLE = ("code", "label:", "struct:")
 
 
-def drift(records: list[dict], tol: float = 0.02) -> list[dict]:
+DRIFT_TOL = 0.02
+
+
+def drift(records: list[dict]) -> list[dict]:
     """Landmarks that moved between one settled step and the next.
 
     Every probe invariant judges a single step in isolation, so a frame can be
@@ -197,7 +229,7 @@ def drift(records: list[dict], tol: float = 0.02) -> list[dict]:
                 continue
             dx = box["left"] - before[key]["left"]
             dy = box["top"] - before[key]["top"]
-            if abs(dx) > tol or abs(dy) > tol:
+            if abs(dx) > DRIFT_TOL or abs(dy) > DRIFT_TOL:
                 found.append(
                     {"step": current["step"], "what": key, "dx": dx, "dy": dy}
                 )
@@ -221,24 +253,20 @@ def report(records: list[dict]) -> int:
     failures = 0
     print(f"\n{'step':>4} {'line':>4} {'c/a':>6}  source")
     print("-" * 78)
+    tally: dict[str, list[int]] = {}
     for rec in records:
         print(f"{rec['step']:>4} {rec['lineno']:>4} "
               f"{rec['content']:>2}/{rec['applied']:<3}  {rec['src'].strip()[:56]}")
         for check in rec.get("checks", []):
+            slot = tally.setdefault(check["name"], [0, 0])
+            slot[0] += 1
             if check["ok"] is True:
                 continue
+            slot[1] += 1
             failures += 1
             mark = "FAIL" if check["ok"] is False else "ERR "
             print(f"       {mark} {check['name']}: {check['detail']}")
     print("-" * 78)
-
-    tally: dict[str, list[int]] = {}
-    for rec in records:
-        for check in rec.get("checks", []):
-            slot = tally.setdefault(check["name"], [0, 0])
-            slot[0] += 1
-            if check["ok"] is not True:
-                slot[1] += 1
     for name, (total, bad) in sorted(tally.items()):
         print(f"  {'FAIL' if bad else ' ok '}  {name:<28} "
               f"{f'{bad}/{total} steps' if bad else f'{total} steps'}")
@@ -315,25 +343,27 @@ def main() -> int:
         if count:
             played.append((rec, movies[offset:offset + count]))
             offset += count
-    expected = sum(r.get("plays", 0) for r in records)
     wanted = parse_steps(args.steps, len(played))
     print(f"\n{len(records)} steps ({len(played)} animated), "
-          f"{expected} plays, {len(movies)} partial movie files")
-    if len(movies) < expected:
+          f"{offset} plays, {len(movies)} partial movie files")
+    if len(movies) < offset:
         print("warning: fewer partial files than recorded plays -- mapping is suspect")
 
     raw_dir = out_dir / "raw"
     tiles_dir = out_dir / "frames"
     tiles_dir.mkdir()
     settled: list[Path] = []
-    tiles: list[Path] = []
+    sheet_frames: list[Path] = []
+    sheet_labels: list[str] = []
 
     for i, (rec, step_movies) in enumerate(played):
         if not step_movies:
             break
+        # Only the steps actually being expanded need every frame.
+        every = i == args.step or (args.dense > 1 and i in wanted)
         frames = []
         for j, movie in enumerate(step_movies):
-            frames.extend(extract_frames(movie, raw_dir / f"{i:03d}_{j}"))
+            frames.extend(extract_frames(movie, raw_dir / f"{i:03d}_{j}", every))
         # Every step contributes its settled frame, so baselines and diffs stay
         # comparable even when --steps narrows what gets drawn onto the sheet.
         settled.append(frames[-1])
@@ -342,15 +372,14 @@ def main() -> int:
         label = f"step {rec['step']}  L{rec['lineno']}  {rec['src'].strip()[:52]}"
         chosen = pick(frames, args.dense)
         for j, frame in enumerate(chosen):
-            suffix = f".{j}" if len(chosen) > 1 else ""
-            tile = tiles_dir / f"{i:03d}{suffix}.png"
-            caption(frame, tile, label + (f"   [{j + 1}/{len(chosen)}]" if suffix else ""),
-                    args.tile_width, args.roi)
-            tiles.append(tile)
+            sheet_frames.append(frame)
+            sheet_labels.append(
+                label + (f"   [{j + 1}/{len(chosen)}]" if len(chosen) > 1 else "")
+            )
 
     sheet = out_dir / "sheet.png"
-    if tiles:
-        montage(tiles, sheet, args.tile)
+    build_sheet(sheet_frames, sheet_labels, sheet, tiles_dir, "",
+                args.tile, args.tile_width, args.roi)
 
     if args.step is not None:
         k = args.step
@@ -359,13 +388,12 @@ def main() -> int:
         else:
             frames = [f for d in sorted(raw_dir.glob(f"{k:03d}_*"))
                       for f in sorted(d.glob("f_*.png"))]
-            strip = []
-            for j, frame in enumerate(frames):
-                tile = tiles_dir / f"strip_{j:03d}.png"
-                caption(frame, tile, f"step {k} frame {j + 1}/{len(frames)}",
-                        args.tile_width, args.roi)
-                strip.append(tile)
-            montage(strip, out_dir / f"step_{k}.png", "4x", label="filmstrip")
+            build_sheet(
+                frames,
+                [f"step {k} frame {j + 1}/{len(frames)}" for j in range(len(frames))],
+                out_dir / f"step_{k}.png", tiles_dir, "strip_", "4x",
+                args.tile_width, args.roi, what="filmstrip",
+            )
             print(f"\nfilmstrip: {out_dir / f'step_{k}.png'}")
 
     if args.save_baseline:

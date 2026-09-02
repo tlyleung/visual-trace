@@ -3,11 +3,19 @@
 Rendering is what makes the real scene slow, and none of these tests need it.
 """
 
-import manim as mn
+from typing import NamedTuple
 
-from visual_trace.utils.table import create_table111
+import manim as mn
+from manim.animation.animation import prepare_animation
+
+from visual_trace.utils.probe import visible_range, x_range
+from visual_trace.utils.table import create_table111, realize_animations
 
 TOL = 0.02
+
+# Production realises the queued builders once the table has positioned every
+# cell; tests that touch a structure's queue directly have to do the same.
+realize = realize_animations
 
 
 class SceneGraph:
@@ -47,17 +55,58 @@ class StubScene(SceneGraph):
         self.right_col = right_column()
 
 
-def render_step(local_vars: dict):
+class Step(NamedTuple):
+    scene: StubScene
+    table: mn.MobjectTable
+    applied: int
+
+
+def render_step(local_vars: dict) -> Step:
     """One traced step. `create_table111` applies deferred work itself."""
     scene = StubScene(dict.fromkeys(local_vars))
-    table = create_table111(local_vars, scene)
-    return scene, table
+    table, applied = create_table111(local_vars, scene)
+    return Step(scene, table, applied)
+
+
+def play_all(queue) -> None:
+    """Advance every animation in `queue` to its end state, as a render would."""
+    for queued in queue:
+        animation = prepare_animation(queued)
+        animation.begin()
+        animation.interpolate(1)
+        animation.finish()
+
+
+def settle(structure) -> None:
+    """Play a structure's own queue, realising its builders first."""
+    play_all(realize(structure.animation_queue))
+    structure.animation_queue.clear()
 
 
 def drain(structure) -> None:
-    for operation in structure.pending_operations:
-        operation()
-    structure.pending_operations.clear()
+    """Run a structure's deferred tree mutations."""
+    structure.apply_pending()
+
+
+#
+# Geometry assertions
+#
+
+
+def visible_size(mobject) -> tuple[float, float]:
+    """(width, height) of what actually renders.
+
+    Raw Manim bounds count invisible geometry; MobjectTable in particular leaves
+    a cell reporting several units wide when its only drawn part is half a unit.
+    """
+    horizontal = visible_range(mobject, axis=0)
+    vertical = visible_range(mobject, axis=1)
+    if horizontal is None or vertical is None:
+        return (0.0, 0.0)
+    return (
+        round(horizontal[1] - horizontal[0], 3),
+        round(vertical[1] - vertical[0], 3),
+    )
 
 
 def row_label(table: mn.MobjectTable, index: int):
@@ -81,48 +130,17 @@ def assert_in_row(value, label, name: str) -> None:
     assert abs(label_y - value_y) <= TOL, (
         f"{name} sits at y={value_y:.3f} but its row label is at y={label_y:.3f}"
     )
-    label_right = float(label.get_corner(mn.DR)[0])
-    value_left = float(value.get_corner(mn.UL)[0])
+    label_right = x_range(label)[1]
+    value_left = x_range(value)[0]
     assert value_left >= label_right - TOL, (
         f"{name} starts at x={value_left:.3f}, left of its label's "
         f"right edge at x={label_right:.3f}"
     )
 
 
-def realize(queue) -> list:
-    """Turn a queue of animations-or-factories into animations.
-
-    `create_table111` does this once the table has positioned every cell; tests
-    that touch the queue directly have to do the same.
-    """
-    return [item() if callable(item) else item for item in queue]
-
-
-def settle(structure) -> None:
-    """Play the queued animations to their end state, as a render would."""
-    from manim.animation.animation import prepare_animation
-
-    for queued in realize(structure.animation_queue):
-        animation = prepare_animation(queued)
-        animation.begin()
-        animation.interpolate(1)
-        animation.finish()
-    structure.animation_queue.clear()
-
-
-def visible_size(mobject) -> tuple[float, float]:
-    """(width, height) of what actually renders.
-
-    Raw Manim bounds count invisible geometry; MobjectTable in particular leaves
-    a cell reporting several units wide when its only drawn part is half a unit.
-    """
-    from visual_trace.utils.probe import visible_range
-
-    horizontal = visible_range(mobject, axis=0)
-    vertical = visible_range(mobject, axis=1)
-    if horizontal is None or vertical is None:
-        return (0.0, 0.0)
-    return (
-        round(horizontal[1] - horizontal[0], 3),
-        round(vertical[1] - vertical[0], 3),
-    )
+def square_opacities(structure, slot: int = 0) -> list[float]:
+    """Fill opacity of one square per drawn cell -- `slot` picks which."""
+    return [
+        round(float(cell[slot].get_fill_opacity()), 2)
+        for cell in structure.mobject.items
+    ]

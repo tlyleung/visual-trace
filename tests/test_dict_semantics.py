@@ -5,9 +5,8 @@ Dict as an argument, so none of this is covered by a render. These are the cases
 the probe cannot reach.
 """
 
-import manim as mn
 
-from stubs import realize
+from stubs import drain, realize
 
 from visual_trace.data_structures.dict import Dict
 
@@ -60,16 +59,13 @@ def test_keys_highlights_each_cell_in_turn():
 def test_clear_empties_the_group_that_is_actually_drawn():
     """`clear` must empty the attached group, not swap in a detached one."""
     d = Dict(a=1, b=2)
-    for operation in getattr(d, "pending_operations", []):
-        operation()
-    d.pending_operations.clear()
+    drain(d)
 
     d.clear()
     # The cells must survive until the fade has played; detaching them at call
     # time would leave the table laying out an empty group mid-animation.
     assert len(d.mobject.items) == 2, "cells were detached before their fade played"
-    for operation in d.pending_operations:
-        operation()
+    drain(d)
 
     attached = [id(m) for m in d.mobject.submobjects]
     assert id(d.mobject.items) in attached, "items group is not attached to the mobject"

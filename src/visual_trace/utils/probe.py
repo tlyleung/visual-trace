@@ -27,14 +27,17 @@ def _renders(mobject) -> bool:
     return stroke > 0 or float(mobject.get_fill_opacity() or 0) > 0
 
 
-def visible_range(mobject, axis: int) -> tuple[float, float] | None:
-    """Extent along ``axis`` of the parts that actually render, or None.
+def visible_extent(mobject) -> tuple[tuple[float, float], tuple[float, float]] | None:
+    """((left, right), (bottom, top)) of the parts that actually render, or None.
 
     Manim bounding boxes count anything with points, visible or not, and this
     project keeps tripping over that: MobjectTable draws its grid with
     ``stroke_width=0`` lines that run far wider than any cell, `become` strands
     zero-area points at the origin, and an empty group collapses there too. Every
     one of those made a correct frame look wrong.
+
+    Both axes come out of one pass over the point cloud: the code listing alone
+    is ~61k points, and measuring it per axis doubled the cost of every box.
     """
     arrays = [
         m.points
@@ -44,14 +47,22 @@ def visible_range(mobject, axis: int) -> tuple[float, float] | None:
     if not arrays:
         return None
     stacked = np.vstack(arrays)
-    return float(stacked[:, axis].min()), float(stacked[:, axis].max())
+    low = stacked.min(axis=0)
+    high = stacked.max(axis=0)
+    return (float(low[0]), float(high[0])), (float(low[1]), float(high[1]))
 
 
-def _x_range(m) -> tuple[float, float]:
+def visible_range(mobject, axis: int) -> tuple[float, float] | None:
+    """Extent of the rendering parts along one axis. See `visible_extent`."""
+    extent = visible_extent(mobject)
+    return None if extent is None else extent[axis]
+
+
+def x_range(m) -> tuple[float, float]:
     return float(m.get_corner(mn.UL)[0]), float(m.get_corner(mn.DR)[0])
 
 
-def _y_range(m) -> tuple[float, float]:
+def y_range(m) -> tuple[float, float]:
     """Return ``(bottom, top)``."""
     return float(m.get_corner(mn.DR)[1]), float(m.get_corner(mn.UL)[1])
 
@@ -64,14 +75,12 @@ def bbox(m) -> dict:
     nothing in the mobject renders, so an empty container still reports a
     position.
     """
-    horizontal = visible_range(m, axis=0)
-    vertical = visible_range(m, axis=1)
-    if horizontal is None or vertical is None:
-        left, right = _x_range(m)
-        bottom, top = _y_range(m)
+    extent = visible_extent(m)
+    if extent is None:
+        left, right = x_range(m)
+        bottom, top = y_range(m)
     else:
-        left, right = horizontal
-        bottom, top = vertical
+        (left, right), (bottom, top) = extent
     return {
         "left": round(left, 4),
         "right": round(right, 4),
@@ -82,12 +91,12 @@ def bbox(m) -> dict:
     }
 
 
-def _overlap(a, b) -> tuple[float, float]:
+def overlap(a, b) -> tuple[float, float]:
     """Overlap extent on each axis. Positive on both axes means intersecting."""
-    ax0, ax1 = _x_range(a)
-    bx0, bx1 = _x_range(b)
-    ay0, ay1 = _y_range(a)
-    by0, by1 = _y_range(b)
+    ax0, ax1 = x_range(a)
+    bx0, bx1 = x_range(b)
+    ay0, ay1 = y_range(a)
+    by0, by1 = y_range(b)
     return min(ax1, bx1) - max(ax0, bx0), min(ay1, by1) - max(ay0, by0)
 
 
@@ -95,17 +104,13 @@ def _check(name: str, ok: bool, detail: str) -> dict:
     return {"name": name, "ok": ok, "detail": detail}
 
 
-def _tracked_lists(local_vars: dict) -> list[tuple[str, Any]]:
+def _tracked(local_vars: dict, container: type = object) -> list[tuple[str, Any]]:
+    """Animated structures in scope, optionally narrowed to one container type."""
     return [
         (n, v)
         for n, v in local_vars.items()
-        if isinstance(v, Animated) and isinstance(v, list)
+        if isinstance(v, Animated) and isinstance(v, container)
     ]
-
-
-def _tracked_structures(local_vars: dict) -> list[tuple[str, Any]]:
-    """Any animated data structure, whatever container it wraps."""
-    return [(n, v) for n, v in local_vars.items() if isinstance(v, Animated)]
 
 
 def _drawn(value) -> bool:
@@ -127,8 +132,8 @@ def highlight_on_row(scene, lineno, local_vars) -> list[dict]:
     trustworthy -- see `utils/highlight.row_center` for why `code_lines` is not.
     """
     numbers = scene.code.line_numbers
-    hb, ht = _y_range(scene.highlight)
-    nb, nt = _y_range(numbers[lineno])
+    hb, ht = y_range(scene.highlight)
+    nb, nt = y_range(numbers[lineno])
     checks = [
         _check(
             "highlight_on_row",
@@ -139,7 +144,7 @@ def highlight_on_row(scene, lineno, local_vars) -> list[dict]:
     for neighbour in (lineno - 1, lineno + 1):
         if not 0 <= neighbour < len(numbers):
             continue
-        jb, jt = _y_range(numbers[neighbour])
+        jb, jt = y_range(numbers[neighbour])
         overlap = min(ht, jt) - max(hb, jb)
         checks.append(
             _check(
@@ -171,8 +176,8 @@ def highlight_row_height(scene, lineno, local_vars) -> list[dict]:
 
 
 def highlight_spans_code_width(scene, lineno, local_vars) -> list[dict]:
-    hl, hr = _x_range(scene.highlight)
-    bl, br = _x_range(scene.code.background)
+    hl, hr = x_range(scene.highlight)
+    bl, br = x_range(scene.code.background)
     ok = hl <= bl + TOL and hr >= br - TOL
     return [
         _check(
@@ -189,7 +194,8 @@ def panels_disjoint(scene, lineno, local_vars) -> list[dict]:
     if code is None or table is None:
         return []
     ox = min(code[1], table[1]) - max(code[0], table[0])
-    _, oy = _overlap(scene.code, scene.table)
+    code_y, table_y = y_range(scene.code), y_range(scene.table)
+    oy = min(code_y[1], table_y[1]) - max(code_y[0], table_y[0])
     ok = not (ox > TOL and oy > TOL)
     return [
         _check(
@@ -209,13 +215,13 @@ def structures_inside_table(scene, lineno, local_vars) -> list[dict]:
     construction position near the origin instead of in its cell.
     """
     checks = []
-    tl, tr = _x_range(scene.table)
-    tb, tt = _y_range(scene.table)
-    for name, value in _tracked_structures(local_vars):
+    tl, tr = x_range(scene.table)
+    tb, tt = y_range(scene.table)
+    for name, value in _tracked(local_vars):
         if not _drawn(value):
             continue
-        left, right = _x_range(value.mobject)
-        bottom, top = _y_range(value.mobject)
+        left, right = x_range(value.mobject)
+        bottom, top = y_range(value.mobject)
         ok = (left >= tl - TOL and right <= tr + TOL
               and bottom >= tb - TOL and top <= tt + TOL)
         checks.append(
@@ -231,14 +237,21 @@ def structures_inside_table(scene, lineno, local_vars) -> list[dict]:
 
 def structures_clear_of_code(scene, lineno, local_vars) -> list[dict]:
     checks = []
-    for name, value in _tracked_structures(local_vars):
+    # Measured once: the code listing is a ~61k-point family, so re-measuring it
+    # per structure dominated the whole probe pass.
+    code_x, code_y = x_range(scene.code), y_range(scene.code)
+    for name, value in _tracked(local_vars):
         if not _drawn(value):
             continue
-        ox, oy = _overlap(scene.code, value.mobject)
-        ok = not (ox > TOL and oy > TOL)
+        value_x, value_y = x_range(value.mobject), y_range(value.mobject)
+        ox = min(code_x[1], value_x[1]) - max(code_x[0], value_x[0])
+        oy = min(code_y[1], value_y[1]) - max(code_y[0], value_y[0])
         checks.append(
-            _check("structures_clear_of_code", ok,
-                   f"{name} overlaps code panel by x={ox:.3f} y={oy:.3f}")
+            _check(
+                "structures_clear_of_code",
+                not (ox > TOL and oy > TOL),
+                f"{name} overlaps code panel by x={ox:.3f} y={oy:.3f}",
+            )
         )
     return checks
 
@@ -248,7 +261,7 @@ def within_frame(scene, lineno, local_vars) -> list[dict]:
     half_h = mn.config.frame_height / 2
     checks = []
     targets = {"code": scene.code, "highlight": scene.highlight, "table": scene.table}
-    for name, value in _tracked_lists(local_vars):
+    for name, value in _tracked(local_vars, list):
         if len(value.mobject.items):
             targets[f"list:{name}"] = value.mobject
     for name, m in targets.items():
@@ -281,7 +294,7 @@ def within_frame(scene, lineno, local_vars) -> list[dict]:
 def list_square_count(scene, lineno, local_vars) -> list[dict]:
     """One drawn cell per element, once ``pending_operations`` have drained."""
     checks = []
-    for name, value in _tracked_lists(local_vars):
+    for name, value in _tracked(local_vars, list):
         drawn = len(value.mobject.items)
         ok = drawn == len(value)
         checks.append(
@@ -297,13 +310,13 @@ def list_square_count(scene, lineno, local_vars) -> list[dict]:
 def list_squares_contiguous(scene, lineno, local_vars) -> list[dict]:
     """Adjacent cells should touch; a growing gap means positioning is wrong."""
     checks = []
-    for name, value in _tracked_lists(local_vars):
+    for name, value in _tracked(local_vars, list):
         items = list(value.mobject.items)
         if len(items) < 2:
             continue
         gaps = []
         for prev, cur in zip(items, items[1:]):
-            gaps.append(_x_range(cur)[0] - _x_range(prev)[1])
+            gaps.append(x_range(cur)[0] - x_range(prev)[1])
         worst = max(gaps, key=abs)
         ok = abs(worst) <= TOL
         checks.append(
@@ -320,7 +333,7 @@ def table_rows_disjoint(scene, lineno, local_vars) -> list[dict]:
     rows = list(scene.table.get_rows())
     bad = []
     for i, (a, b) in enumerate(zip(rows, rows[1:])):
-        _, oy = _overlap(a, b)
+        _, oy = overlap(a, b)
         if oy > TOL:
             bad.append(f"rows {i}/{i + 1} overlap y={oy:.3f}")
     ok = not bad
@@ -366,7 +379,7 @@ def probe_step(scene, lineno: int, local_vars: dict) -> dict:
         "table": bbox(scene.table),
         "line": bbox(scene.code.code_lines[lineno]),
     }
-    for name, value in _tracked_structures(local_vars):
+    for name, value in _tracked(local_vars):
         if _drawn(value):
             geometry[f"struct:{name}"] = bbox(value.mobject)
 

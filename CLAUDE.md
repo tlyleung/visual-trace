@@ -94,7 +94,8 @@ uv run scripts/verify.py examples/list_operations.py --diff good
 Useful flags: `--steps K-M` to narrow the sheet, `--roi code|table` to crop to one
 panel at full resolution, `--dense N` for N frames per step (timing bugs — a step
 sampled only at its settled frame hides them), `--step K` for a full-res
-filmstrip of one step, `--diff NAME` for a pixel diff against a saved baseline.
+filmstrip of one step, `--diff NAME` for a pixel diff against a saved baseline, and `--gif` for a
+small looping GIF of the whole render.
 
 Everything lands in `media/verify/<example>/`, which is gitignored.
 
@@ -189,11 +190,12 @@ If a rendering complaint is about *movement*, read that table before anything el
   correct frame look wrong. Use `probe.visible_range`, which counts only what
   actually puts ink on the frame.
 - **`.animate` snapshots its target when the builder is created**, not when it
-  plays. Cells are queued while user code runs and only positioned when
-  `create_table111` lays the table out, so an animation built with `.animate`
-  will drag its mobject back to wherever the previous table had it. Queue one of
-  the deferred builders in `data_structures/base.py` instead; the table realises
-  them once every cell is in its final place.
+  plays. Cells are queued while user code runs and only positioned when the
+  table is laid out, so an animation built with `.animate` will drag its mobject
+  back to wherever the previous table had it. `Animated.queue` takes an already
+  built animation and rejects anything else; `.animate` goes through
+  `Animated.queue_deferred` with one of the builders in `data_structures/base.py`,
+  which the table realises once every cell is in its final place.
 - **New cells are built at the world origin**, so anything created after a layout
   must be anchored to something already drawn — the previous cell, or the
   placeholder when the container is empty. Forget this and the cell appears
@@ -202,6 +204,8 @@ If a rendering complaint is about *movement*, read that table before anything el
   sizes each row to its tallest cell, so a value going from text to a drawn
   structure resized its row and the centred table shifted every other row with
   it. If you add a structure taller than the pitch, the drift table will say so.
+- Only the steps being expanded have every frame extracted; the rest keep just
+  the settled one. `--dense`/`--step` opt back in.
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.

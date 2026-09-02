@@ -2,7 +2,7 @@ from typing import Any, Callable
 
 import manim as mn
 
-
+CELL_SIZE = 0.5
 PLACEHOLDER_OPACITY = 0.35
 
 
@@ -10,24 +10,24 @@ PLACEHOLDER_OPACITY = 0.35
 # Deferred animation builders.
 #
 # `.animate` snapshots its target the moment the builder is created, but cells
-# are queued while user code runs and only positioned when `create_table111`
-# lays the table out. An animation built too early therefore interpolates its
-# mobject back to wherever the previous table had it -- a cell flying in from
-# offscreen. Queue one of these instead; the table realises them once everything
-# is in its final place. Taking the mobject as a parameter also gives each
-# closure its own binding, which a lambda written inside a loop would not have.
+# are queued while user code runs and only positioned when the table is laid
+# out. An animation built too early therefore interpolates its mobject back to
+# wherever the previous table had it -- a cell flying in from offscreen. Pass one
+# of these to `queue_deferred`; the table realises them once everything is in
+# its final place. Taking the mobject as a parameter also gives each closure its
+# own binding, which a lambda written inside a loop would not have.
 #
 
 
-def fade_fill(mobject, opacity: float, color=None):
-    return lambda: mobject.animate.set_fill(color or mn.WHITE, opacity=opacity)
+def fade_fill(mobject, opacity: float) -> Callable[[], Any]:
+    return lambda: mobject.animate.set_fill(mn.WHITE, opacity=opacity)
 
 
-def fade_stroke(mobject, opacity: float):
+def fade_stroke(mobject, opacity: float) -> Callable[[], Any]:
     return lambda: mobject.animate.set_stroke(opacity=opacity)
 
 
-def shift_by(mobject, vector):
+def shift_by(mobject, vector) -> Callable[[], Any]:
     return lambda: mobject.animate.shift(vector)
 
 
@@ -39,80 +39,55 @@ class Animated:
     animation falls out of the algorithm's own data access rather than being
     scripted separately.
 
-    Two queues make that work, and the scene drains both each step:
+    Drawn cells live in ``mobject.items`` and the empty-state outline in
+    ``mobject.placeholder``, so nothing else parented to the mobject is mistaken
+    for a cell.
 
     ``animation_queue``
-        Animations to play, or zero-argument callables returning one.
-        `create_table111` moves them onto the scene, realising the callables
-        only after the table has positioned every cell -- see the deferred
-        builders above for why that matters.
+        Uniformly a list of zero-argument callables returning an animation. Use
+        `queue` for one already built and `queue_deferred` for a `.animate`
+        builder; the table realises them all once every cell is positioned.
 
     ``pending_operations``
-        Mobject-tree mutations that must not happen yet. `create_table111`
-        applies them *before* laying the table out, so a structure whose group
-        is still empty at layout time is not arranged as nothing. Use it for
-        removals, which have to outlive the fade that animates them; additions
-        may equally well be applied inline, as `Dict` does.
-
-    Positioning a new cell has to account for both: sit it against the last cell
-    already in the group, then step it over however many cells are queued in this
-    same batch (``len(self.pending_operations)``). Absolute placement by logical
-    index looks equivalent while the group is still at the origin and breaks the
-    moment the table moves it into a cell.
+        Mobject-tree mutations that must not happen yet -- removals, which have
+        to outlive the fade that animates them. Additions go in directly, since
+        `create_table111` needs a populated group to lay out.
     """
 
     def __init__(self, mobject: mn.Mobject, *args: Any, **kwargs: Any):
         self.mobject = mobject
-        # Cells live in their own group so that anything else parented to the
-        # mobject -- the empty-state placeholder -- is not mistaken for one.
         self.mobject.items = mn.VGroup()
         self.mobject.add(self.mobject.items)
-        self.animation_queue: list = []
+        self.animation_queue: list[Callable[[], Any]] = []
         self.pending_operations: list[Callable[[], None]] = []
         # Kept so the scene can rebuild the structure between tracing passes.
         self._initial_arguments = (args, kwargs)
 
-    def _init_placeholder(self, rows: int) -> None:
-        """Give the container an outline to occupy while it is empty.
+    #
+    # Queueing
+    #
 
-        Drawing nothing for an empty container is indistinguishable from a
-        rendering failure, and it hides real logic -- searching an empty dict
-        would otherwise animate nothing at all. The outline is sized to overlap
-        the first real cell exactly, so showing and hiding it never moves the
-        container's bounds.
+    def queue(self, animation: mn.Animation) -> None:
+        """Queue an animation that is already built.
+
+        Safe to build eagerly: `Create`, `FadeIn` and friends read the mobject's
+        state when they begin, not when they are constructed.
         """
-        squares = [
-            mn.Square(
-                side_length=0.5,
-                stroke_opacity=PLACEHOLDER_OPACITY,
-                fill_opacity=0.0,
+        if not isinstance(animation, mn.Animation):
+            raise TypeError(
+                "queue() takes a built Animation. For a `.animate` builder use "
+                "queue_deferred(): `.animate` snapshots its target when created, "
+                "so queueing one eagerly drags its mobject back to where the "
+                "previous layout had it."
             )
-            for _ in range(rows)
-        ]
-        for upper, lower in zip(squares, squares[1:]):
-            upper.next_to(lower, mn.UP, buff=0)
+        self.animation_queue.append(lambda: animation)
 
-        self.mobject.placeholder = mn.VGroup(*squares)
-        self.mobject.add(self.mobject.placeholder)
-        if len(self):
-            self.mobject.placeholder.set_stroke(opacity=0.0)
+    def queue_deferred(self, build: Callable[[], Any]) -> None:
+        """Queue a factory, realised only once the table has positioned cells."""
+        self.animation_queue.append(build)
 
-    def _show_placeholder(self, visible: bool) -> None:
-        """Queue the fade between empty and occupied."""
-        target = PLACEHOLDER_OPACITY if visible else 0.0
-        self.animation_queue.append(fade_stroke(self.mobject.placeholder, target))
-
-    def reset(self):
-        """Return a fresh instance with the same initial arguments.
-
-        `Animation.construct` traces twice -- once to collect variable names and
-        once to animate -- so the first pass's mutations have to be undone.
-        """
-        args, kwargs = self._initial_arguments
-        return type(self)(*args, **kwargs)
-
-    def drain_animations(self) -> list:
-        """Hand over the queued animations and forget them."""
+    def drain_animations(self) -> list[Callable[[], Any]]:
+        """Hand over the queued builders and forget them."""
         queued = list(self.animation_queue)
         self.animation_queue.clear()
         return queued
@@ -124,3 +99,71 @@ class Animated:
         for operation in operations:
             operation()
         return len(operations)
+
+    #
+    # Cells and the empty state
+    #
+
+    def _init_placeholder(self, rows: int) -> None:
+        """Give the container an outline to occupy while it is empty.
+
+        Drawing nothing for an empty container is indistinguishable from a
+        rendering failure, and it hides real logic -- searching an empty dict
+        would otherwise animate nothing at all. The outline stands exactly where
+        the first cell goes, so filling the container is a crossfade rather than
+        a reflow.
+        """
+        squares = [
+            mn.Square(
+                side_length=CELL_SIZE,
+                stroke_opacity=PLACEHOLDER_OPACITY,
+                fill_opacity=0.0,
+            )
+            for _ in range(rows)
+        ]
+        for upper, lower in zip(squares, squares[1:]):
+            upper.next_to(lower, mn.UP, buff=0)
+
+        self.mobject.placeholder = mn.VGroup(*squares)
+        self.mobject.add(self.mobject.placeholder)
+        self._was_empty = not len(self)
+        if not self._was_empty:
+            self.mobject.placeholder.set_stroke(opacity=0.0)
+
+    def _place_cell(self, cell: mn.Mobject) -> None:
+        """Position a new cell against what is already drawn.
+
+        Cells are built at the world origin, so one created after the table has
+        moved the container must anchor to something on screen: the last drawn
+        cell, or the placeholder when there is none yet.
+        """
+        if len(self.mobject.items):
+            cell.next_to(self.mobject.items[-1], mn.RIGHT, buff=0)
+        else:
+            cell.move_to(self.mobject.placeholder)
+
+    def _sync_placeholder(self) -> None:
+        """Fade the outline in or out, but only when emptiness actually changed.
+
+        Called from every mutating method so no future one has to remember the
+        transition -- forgetting it fails silently, as an outline stuck behind
+        real cells or an empty container drawing nothing.
+        """
+        empty = not len(self)
+        if empty == self._was_empty:
+            return
+        self._was_empty = empty
+        self.queue_deferred(
+            fade_stroke(
+                self.mobject.placeholder, PLACEHOLDER_OPACITY if empty else 0.0
+            )
+        )
+
+    def reset(self):
+        """Return a fresh instance with the same initial arguments.
+
+        `Animation.construct` traces twice -- once to collect variable names and
+        once to animate -- so the first pass's mutations have to be undone.
+        """
+        args, kwargs = self._initial_arguments
+        return type(self)(*args, **kwargs)

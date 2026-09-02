@@ -1,14 +1,14 @@
 import manim as mn
 
-from .base import Animated, fade_fill, shift_by
+from .base import CELL_SIZE, Animated, fade_fill, shift_by
+
+# Which half of a cell to light: a cell is (key_square, key_label, val_square,
+# val_label), stacked vertically.
+KEY, VALUE = 0, 2
 
 
 class Dict(Animated, dict):
-    """
-    A dict containing mobjects that can be animated by consuming the animation queue.
-    """
-
-    FADE_TIME = 0.2
+    """A dict that draws itself as a row of stacked key/value cells."""
 
     def __init__(self, **kwargs):
         dict.__init__(self, kwargs)
@@ -16,82 +16,72 @@ class Dict(Animated, dict):
         self._init_placeholder(rows=2)
 
         for key, value in kwargs.items():
-            self.animation_queue.extend(self.__append_animation(key, value))
+            self.__draw(key, value)
 
-    def __append_animation(self, key, value):
-        key_square = mn.Square(side_length=0.5, fill_color=mn.WHITE, fill_opacity=0.0)
-        key_label = mn.Text(str(key), font_size=24)
+    #
+    # Animation methods
+    #
 
-        val_square = mn.Square(side_length=0.5, fill_color=mn.WHITE, fill_opacity=0.0)
-        val_label = mn.Text(str(value), font_size=24)
-
-        # Stack key and value squares vertically
+    def __draw(self, key: object, value: object) -> None:
+        key_square = mn.Square(
+            side_length=CELL_SIZE, fill_color=mn.WHITE, fill_opacity=0.0
+        )
+        val_square = mn.Square(
+            side_length=CELL_SIZE, fill_color=mn.WHITE, fill_opacity=0.0
+        )
         key_square.next_to(val_square, mn.UP, buff=0)
-        key_label.move_to(key_square.get_center())
-        val_label.move_to(val_square.get_center())
 
-        item = mn.VGroup(key_square, key_label, val_square, val_label)
-        # Cells are built at the world origin, so a cell added after the table
-        # has moved the container must be anchored to something already drawn.
-        # The placeholder stands exactly where the first cell belongs.
-        if len(self.mobject.items):
-            item.next_to(self.mobject.items, mn.RIGHT, buff=0)
-        else:
-            item.move_to(self.mobject.placeholder)
+        key_label = mn.Text(str(key), font_size=24).move_to(key_square)
+        val_label = mn.Text(str(value), font_size=24).move_to(val_square)
 
-        self.mobject.items.add(item)
+        cell = mn.VGroup(key_square, key_label, val_square, val_label)
+        self._place_cell(cell)
+        self.mobject.items.add(cell)
 
-        return [
-            mn.Create(key_square),
-            mn.FadeIn(key_label),
-            mn.Create(val_square),
-            mn.FadeIn(val_label),
-        ]
+        for part in (key_square, key_label, val_square, val_label):
+            self.queue(
+                mn.Create(part) if isinstance(part, mn.Square) else mn.FadeIn(part)
+            )
 
-    def __remove_animation(self, index):
-        item = self.mobject.items[index]
-        self.mobject.items.remove(item)
+    def __highlight(self, index: int, slot: int, settled: float = 0.0) -> None:
+        """Light one half of a cell, settling at `settled` when the fade ends."""
+        square = self.mobject.items[index][slot]
+        square.set_fill(mn.WHITE, opacity=0.5)
+        self.queue_deferred(fade_fill(square, settled))
 
-        animations = [mn.FadeOut(item)]
+    def __search(self, key: object, found: bool) -> None:
+        """Sweep every key as if scanning, then settle on the outcome."""
+        for index, candidate in enumerate(dict.keys(self)):
+            self.__highlight(
+                index, KEY, settled=0.5 if found and candidate == key else 0.0
+            )
 
-        for item in self.mobject.items[index:]:
-            animations.append(shift_by(item, mn.LEFT / 2))
+    def __remove(self, index: int) -> None:
+        cell = self.mobject.items[index]
+        self.mobject.items.remove(cell)
+        self.queue(mn.FadeOut(cell))
+        for following in self.mobject.items[index:]:
+            self.queue_deferred(shift_by(following, mn.LEFT * CELL_SIZE))
 
-        return animations
-
-    def __highlight_key_animation(self, index):
-        key_square, _, _, _ = self.mobject.items[index]
-        key_square.set_fill(mn.WHITE, opacity=0.5)
-        return [fade_fill(key_square, 0.0)]
-
-    def __highlight_val_animation(self, index):
-        _, _, val_square, _ = self.mobject.items[index]
-        val_square.set_fill(mn.WHITE, opacity=0.5)
-        return [fade_fill(val_square, 0.0)]
-
-    def __replace_val_animation(self, index, value):
+    def __replace_value(self, index: int, value: object) -> None:
         _, _, val_square, val_label = self.mobject.items[index]
         val_square.set_fill(mn.WHITE, opacity=1.0)
-
-        return [
-            fade_fill(val_square, 0.0),
-            # The replacement is positioned at play time too: building it now
-            # would aim at wherever the cell sits before the table lays out.
+        self.queue_deferred(fade_fill(val_square, 0.0))
+        # The replacement is positioned at play time too: building it now would
+        # aim at wherever the cell sits before the table lays out.
+        self.queue_deferred(
             lambda: mn.Transform(
                 val_label,
                 mn.Text(str(value), font_size=24).move_to(val_square.get_center()),
-            ),
-        ]
+            )
+        )
 
-    def __search_animation(self, key, found: bool) -> list:
-        """Sweep every key as if scanning, then settle on the outcome."""
-        animations = []
-        for index, candidate in enumerate(dict.keys(self)):
-            key_square, _, _, _ = self.mobject.items[index]
-            key_square.set_fill(mn.WHITE, opacity=0.5)
-            settled = 0.5 if found and candidate == key else 0.0
-            animations.append(fade_fill(key_square, settled))
-        return animations
+    def __index_of(self, key: object) -> int:
+        return list(dict.keys(self)).index(key)
+
+    #
+    # Dict methods
+    #
 
     def __contains__(self, key):
         """Show the search that `in` performs, hit or miss.
@@ -100,50 +90,46 @@ class Dict(Animated, dict):
         tool forgot to render, so both outcomes sweep; only the settle differs.
         """
         found = dict.__contains__(self, key)
-        self.animation_queue.extend(self.__search_animation(key, found))
+        self.__search(key, found)
         return found
-
-    def __delitem__(self, key):
-        index = list(super().keys()).index(key)
-        super().__delitem__(key)
-        self.animation_queue.extend(self.__remove_animation(index))
-        if not len(self):
-            self._show_placeholder(True)
 
     def __getitem__(self, key):
         """Highlight the key-value pair for the given key."""
-        if dict.__contains__(self, key):
-            index = list(super().keys()).index(key)
-            self.animation_queue.extend(self.__highlight_key_animation(index))
-            self.animation_queue.extend(self.__highlight_val_animation(index))
-            return super().__getitem__(key)
-        else:
+        if not dict.__contains__(self, key):
             raise KeyError(f"Key {key} not found.")
+        index = self.__index_of(key)
+        self.__highlight(index, KEY)
+        self.__highlight(index, VALUE)
+        return dict.__getitem__(self, key)
 
     def __setitem__(self, key, value):
         if dict.__contains__(self, key):
-            index = list(super().keys()).index(key)
-            super().__setitem__(key, value)
-            self.animation_queue.extend(self.__highlight_key_animation(index))
-            self.animation_queue.extend(self.__replace_val_animation(index, value))
+            index = self.__index_of(key)
+            dict.__setitem__(self, key, value)
+            self.__highlight(index, KEY)
+            self.__replace_value(index, value)
         else:
-            was_empty = not len(self)
-            super().__setitem__(key, value)
-            if was_empty:
-                self._show_placeholder(False)
-            self.animation_queue.extend(self.__append_animation(key, value))
+            dict.__setitem__(self, key, value)
+            self._sync_placeholder()
+            self.__draw(key, value)
+
+    def __delitem__(self, key):
+        index = self.__index_of(key)
+        dict.__delitem__(self, key)
+        self.__remove(index)
+        self._sync_placeholder()
 
     def items(self):
         """Return an animated list of key-value pairs."""
-        for index, (key, value) in enumerate(super().items()):
-            self.animation_queue.extend(self.__highlight_key_animation(index))
-            self.animation_queue.extend(self.__highlight_val_animation(index))
+        for index, (key, value) in enumerate(dict.items(self)):
+            self.__highlight(index, KEY)
+            self.__highlight(index, VALUE)
             yield key, value
 
     def keys(self):
         """Return an animated list of keys."""
-        for index, key in enumerate(super().keys()):
-            self.animation_queue.extend(self.__highlight_key_animation(index))
+        for index, key in enumerate(dict.keys(self)):
+            self.__highlight(index, KEY)
             yield key
 
     def values(self):
@@ -153,8 +139,8 @@ class Dict(Animated, dict):
         returns the first match, so a repeated value would re-highlight the
         earlier cell and never its own.
         """
-        for index, value in enumerate(super().values()):
-            self.animation_queue.extend(self.__highlight_val_animation(index))
+        for index, value in enumerate(dict.values(self)):
+            self.__highlight(index, VALUE)
             yield value
 
     def clear(self):
@@ -164,13 +150,14 @@ class Dict(Animated, dict):
         one: the group added in `__init__` is what is actually drawn, so swapping
         it leaves the old cells on screen and the replacement detached.
         """
-        items = list(self.mobject.items)
-        self.animation_queue.extend(mn.FadeOut(item) for item in items)
-        if items:
+        cells = list(self.mobject.items)
+        for cell in cells:
+            self.queue(mn.FadeOut(cell))
+        if cells:
             # Detach only once the fade has played. Emptying now would have the
             # table lay out nothing while the cells are still on screen.
             self.pending_operations.append(
-                lambda: self.mobject.items.remove(*items)
+                lambda: self.mobject.items.remove(*cells)
             )
-        super().clear()
-        self._show_placeholder(True)
+        dict.clear(self)
+        self._sync_placeholder()

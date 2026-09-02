@@ -8,7 +8,6 @@ Every case uses at least two rows: in a single-row table the row sits at y=0,
 which is exactly where a mislaid mobject lands, so the bug hides.
 """
 
-import manim as mn
 
 from stubs import (
     TOL,
@@ -20,19 +19,20 @@ from stubs import (
 )
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
+from visual_trace.utils.probe import overlap as probe_overlap, x_range
 from visual_trace.utils.table import create_table, create_table111, refresh_table
 
 
 def test_list_materialises_in_its_row():
     """A List drawn on its first step lands in its cell, not at the origin."""
     nums = List(2, 7, 11, 15)
-    _, table = render_step({"target": 9, "nums": nums})
+    table = render_step({"target": 9, "nums": nums}).table
     assert_in_row(nums.mobject, row_label(table, 1), "nums")
 
 
 def test_dict_materialises_in_its_row():
     d = Dict(a=1, b=2)
-    _, table = render_step({"target": 9, "d": d})
+    table = render_step({"target": 9, "d": d}).table
     assert_in_row(d.mobject, row_label(table, 1), "d")
 
 
@@ -64,11 +64,7 @@ def test_emptied_cell_leaves_no_phantom_row_geometry():
 
     rows = list(scene.table.get_rows())
     for index, (upper, lower) in enumerate(zip(rows, rows[1:])):
-        overlap = min(
-            float(upper.get_corner(mn.UL)[1]), float(lower.get_corner(mn.UL)[1])
-        ) - max(
-            float(upper.get_corner(mn.DR)[1]), float(lower.get_corner(mn.DR)[1])
-        )
+        _, overlap = probe_overlap(upper, lower)
         assert overlap <= TOL, (
             f"rows {index} and {index + 1} overlap by {overlap:.3f} after a "
             f"cell emptied"
@@ -89,7 +85,7 @@ def test_cells_stay_contiguous_across_steps():
 
     cells = list(nums.mobject.items)
     gaps = [
-        float(right.get_corner(mn.UL)[0]) - float(left.get_corner(mn.DR)[0])
+        x_range(right)[0] - x_range(left)[1]
         for left, right in zip(cells, cells[1:])
     ]
     assert all(abs(gap) <= TOL for gap in gaps), f"cells are not contiguous: {gaps}"
@@ -98,7 +94,7 @@ def test_cells_stay_contiguous_across_steps():
 def test_the_return_value_gets_its_own_row():
     """Reserved from the first frame so the row set never shifts."""
     scene = StubScene({"total": None, "return": None})
-    table = create_table111({"total": 19, "return": "(0, 1)"}, scene)
+    table, _ = create_table111({"total": 19, "return": "(0, 1)"}, scene)
     rows = table.get_rows()
     # `.text` is the glyph string, with spaces stripped; `original_text` is
     # what was actually asked for and what gets rendered.
@@ -108,7 +104,7 @@ def test_the_return_value_gets_its_own_row():
 
 def test_the_return_row_reads_undefined_until_the_function_returns():
     scene = StubScene({"total": None, "return": None})
-    table = create_table111({"total": 19}, scene)
+    table, _ = create_table111({"total": 19}, scene)
     assert table.get_rows()[-1][1].original_text == "Undefined"
 
 
@@ -125,11 +121,11 @@ def test_rows_sit_at_a_fixed_pitch_whatever_the_cells_hold():
     the whole panel jumping, and no single-step check can see it.
     """
     names = {"a": None, "b": None, "c": None}
-    plain = create_table111({"a": 1, "b": 2, "c": 3}, StubScene(dict(names)))
+    plain, _ = create_table111({"a": 1, "b": 2, "c": 3}, StubScene(dict(names)))
 
     tall = Dict(x=1)
     drain(tall)
-    with_structure = create_table111(
+    with_structure, _ = create_table111(
         {"a": 1, "b": tall, "c": 3}, StubScene(dict(names))
     )
 

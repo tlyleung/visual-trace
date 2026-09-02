@@ -21,7 +21,9 @@ def create_table(scene: mn.Scene) -> mn.MobjectTable:
     return table
 
 
-def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
+def create_table111(
+    local_vars: dict, scene: mn.Scene
+) -> tuple[mn.MobjectTable, int]:
     data = []
     applied = 0
     deferred = []
@@ -57,14 +59,22 @@ def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
     # Now that every cell is in its final position, realise the animations that
     # had to wait for it. Anything already an Animation reads the mobject's
     # current state when it begins and is safe to pass through.
-    scene.animation_queue.extend(
-        item() if callable(item) else item for item in deferred
-    )
-    scene.applied_operations = applied
-    return table
+    scene.animation_queue.extend(realize_animations(deferred))
+    return table, applied
 
 
-def refresh_table(scene: mn.Scene, local_vars: dict) -> mn.MobjectTable:
+def realize_animations(deferred: list) -> list:
+    """Build queued animations. Only call once every cell is in its final place.
+
+    The structures queue builders rather than animations precisely so this can
+    happen after the layout -- see `data_structures.base`.
+    """
+    return [build() for build in deferred]
+
+
+def refresh_table(
+    scene: mn.Scene, local_vars: dict
+) -> tuple[mn.MobjectTable, int]:
     """Update the displayed variables table to match the current locals.
 
     Swaps the mobject in rather than `become`-ing the old one onto the new.
@@ -74,11 +84,11 @@ def refresh_table(scene: mn.Scene, local_vars: dict) -> mn.MobjectTable:
     equivalent on screen -- this runs outside any animation, so the table
     updates instantly either way.
     """
-    new_table = create_table111(local_vars, scene)
+    new_table, applied = create_table111(local_vars, scene)
     scene.remove(scene.table)
     scene.add(new_table)
     scene.table = new_table
-    return new_table
+    return new_table, applied
 
 
 def _pin_rows(table: mn.MobjectTable) -> None:

@@ -9,10 +9,8 @@ visibly flying in from wherever the previous table put it.
 No settled-frame check can see this: the animation ends at the correct position.
 """
 
-import manim as mn
-from manim.animation.animation import prepare_animation
 
-from stubs import StubScene, drain, settle
+from stubs import StubScene, drain, play_all, settle
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 from visual_trace.utils.table import create_table111
@@ -25,22 +23,13 @@ def positions(mobject) -> list[tuple[float, float]]:
     ]
 
 
-def play(scene) -> None:
-    for queued in scene.animation_queue:
-        animation = prepare_animation(queued)
-        animation.begin()
-        animation.interpolate(1)
-        animation.finish()
-    scene.animation_queue.clear()
-
-
 def lay_out_and_play(structure, name):
     """Queue, lay out (which moves things), then play -- the real order."""
     local = {"target": 9, name: structure}
     scene = StubScene(dict.fromkeys(local))
     create_table111(local, scene)
     before = positions(structure.mobject)
-    play(scene)
+    play_all(scene.animation_queue)
     return before, positions(structure.mobject)
 
 
