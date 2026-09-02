@@ -7,7 +7,7 @@ from ..data_structures.base import Animated
 from ..utils.highlight import create_highlight
 from ..utils.table import create_table
 from ..utils.trace_log import open_log
-from ..utils.tracing import start_tracing
+from ..utils.tracing import flush, start_tracing
 
 
 class Animation(mn.Scene):
@@ -68,6 +68,7 @@ class Animation(mn.Scene):
         # Animate using second trace
         self.trace_pass = 2
         start_tracing(self, self.func, *self.args, **self.kwargs)
+        flush(self)
         self.wait()
 
         if self.trace_log is not None:

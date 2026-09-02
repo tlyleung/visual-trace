@@ -12,8 +12,9 @@ from .trace_log import safe_repr
 
 def record_step(
     scene: mn.Scene,
-    frame: FrameType,
     lineno: int,
+    abs_lineno: int,
+    local_vars: dict,
     content: int,
     applied: int,
     plays: int,
@@ -36,9 +37,9 @@ def record_step(
     record = {
         "step": step,
         "lineno": lineno,
-        "abs_lineno": frame.f_lineno,
+        "abs_lineno": abs_lineno,
         "src": source,
-        "locals": {k: safe_repr(v) for k, v in frame.f_locals.items()},
+        "locals": {k: safe_repr(v) for k, v in local_vars.items()},
         "content": content,
         "applied": applied,
         # Each play() writes one partial movie file, and a step makes one or
@@ -46,8 +47,36 @@ def record_step(
         # files on disk.
         "plays": plays,
     }
-    record.update(probe_step(scene, lineno, frame.f_locals))
+    record.update(probe_step(scene, lineno, local_vars))
     log.emit(**record)
+
+
+def flush(scene: mn.Scene) -> int:
+    """Draw whatever the final traced line queued.
+
+    Every other line's animations are harvested at the *following* line event.
+    The last line has no following event, so without this its effects -- often
+    the answer the algorithm just computed -- are silently dropped.
+    """
+    local_vars = getattr(scene, "last_locals", None)
+    if local_vars is None:
+        return 0
+
+    refresh_table(scene, local_vars)
+    queued = list(scene.animation_queue)
+    scene.animation_queue.clear()
+    if queued:
+        scene.play(*queued)
+    record_step(
+        scene,
+        scene.last_lineno,
+        scene.last_abs_lineno,
+        local_vars,
+        len(queued),
+        0,
+        1 if queued else 0,
+    )
+    return len(queued)
 
 
 def trace_func(
@@ -71,6 +100,10 @@ def trace_func(
             plays = 0
             content = 0
             applied = 0
+            # Kept so the run can be flushed once the function has returned.
+            scene.last_locals = dict(frame.f_locals)
+            scene.last_lineno = lineno
+            scene.last_abs_lineno = frame.f_lineno
 
             # Second pass: animate code highlight and variables table
             if hasattr(scene, "table"):
@@ -98,7 +131,15 @@ def trace_func(
                 )
                 plays += 1
 
-            record_step(scene, frame, lineno, content, applied, plays)
+            record_step(
+                scene,
+                lineno,
+                frame.f_lineno,
+                frame.f_locals,
+                content,
+                applied,
+                plays,
+            )
 
     return lambda *args, **kwargs: trace_func(
         *args, **kwargs, func=func, scene=scene, variables=variables

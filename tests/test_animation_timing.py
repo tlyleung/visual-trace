@@ -15,10 +15,11 @@ import manim as mn
 from manim.animation.animation import prepare_animation
 
 from stubs import SceneGraph, right_column
+from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 from visual_trace.utils.highlight import create_highlight, row_center
 from visual_trace.utils.table import create_table
-from visual_trace.utils.tracing import start_tracing
+from visual_trace.utils.tracing import flush, start_tracing
 
 
 class RecordingScene(SceneGraph):
@@ -73,7 +74,9 @@ def drive(func, *args):
     args = tuple(a.reset() if hasattr(a, "reset") else a for a in args)
     scene.step = 0
     scene.plays.clear()
+    scene.args_structure = args[0]
     start_tracing(scene, func, *args)
+    flush(scene)
     return scene
 
 
@@ -113,3 +116,20 @@ def test_highlight_moves_separately_from_content():
         and any("Method" not in k for k in p["kinds"])
     ]
     assert not mixed, f"plays mixing highlight movement with content: {mixed}"
+
+
+def returns_a_lookup(d):
+    d["a"] = 1
+    return d["a"]
+
+
+def test_nothing_the_last_line_queued_is_left_undrawn():
+    """The final line has no following event to harvest its animations.
+
+    Every other line's effects are collected at the *next* line event. The last
+    one has no next event, so without an explicit flush the closing move of the
+    algorithm -- often the answer itself -- is silently dropped.
+    """
+    scene = drive(returns_a_lookup, Dict())
+    leftover = scene.args_structure.animation_queue
+    assert not leftover, f"{len(leftover)} animations were never drawn"
