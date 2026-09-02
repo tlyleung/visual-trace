@@ -1,3 +1,4 @@
+import argparse
 import sys
 from pathlib import Path
 
@@ -6,33 +7,43 @@ import manim as mn
 from visual_trace.scenes.base import Animation
 from visual_trace.utils.loader import load_target
 
+QUALITIES = ["low_quality", "medium_quality", "high_quality", "production_quality"]
+
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: visual-trace <python_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Render a Python function's execution as an animated video."
+    )
+    parser.add_argument("script", type=Path, help="a script defining main() -> (func, args)")
+    parser.add_argument(
+        "--quality",
+        choices=QUALITIES,
+        default="low_quality",
+        help="render quality (default: low_quality, 854x480 -- the code listing "
+        "is drawn small and is hard to read below medium)",
+    )
+    args = parser.parse_args()
 
-    script_path = sys.argv[1]
-    if not Path(script_path).is_file():
-        print(f"Error: File {script_path} does not exist.")
+    if not args.script.is_file():
+        print(f"Error: File {args.script} does not exist.")
         sys.exit(1)
 
     try:
-        func, args = load_target(Path(script_path))
+        func, func_args = load_target(args.script)
     except AttributeError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
     # Configure Manim
-    mn.config.quality = "low_quality"
+    mn.config.quality = args.quality
     mn.config.media_dir = "./media"
-    mn.config.output_file = Path(script_path).stem
+    mn.config.output_file = args.script.stem
 
     # Generate Animation
-    scene = Animation(func=func, args=args)
+    scene = Animation(func=func, args=func_args)
     scene.render()
 
-    print(f"Animation exported to {mn.config.output_file}")
+    print(f"Animation exported to {scene.renderer.file_writer.movie_file_path}")
 
 
 if __name__ == "__main__":
