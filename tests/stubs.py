@@ -89,13 +89,40 @@ def assert_in_row(value, label, name: str) -> None:
     )
 
 
+def realize(queue) -> list:
+    """Turn a queue of animations-or-factories into animations.
+
+    `create_table111` does this once the table has positioned every cell; tests
+    that touch the queue directly have to do the same.
+    """
+    return [item() if callable(item) else item for item in queue]
+
+
 def settle(structure) -> None:
     """Play the queued animations to their end state, as a render would."""
     from manim.animation.animation import prepare_animation
 
-    for queued in structure.animation_queue:
+    for queued in realize(structure.animation_queue):
         animation = prepare_animation(queued)
         animation.begin()
         animation.interpolate(1)
         animation.finish()
     structure.animation_queue.clear()
+
+
+def visible_size(mobject) -> tuple[float, float]:
+    """(width, height) of what actually renders.
+
+    Raw Manim bounds count invisible geometry; MobjectTable in particular leaves
+    a cell reporting several units wide when its only drawn part is half a unit.
+    """
+    from visual_trace.utils.probe import visible_range
+
+    horizontal = visible_range(mobject, axis=0)
+    vertical = visible_range(mobject, axis=1)
+    if horizontal is None or vertical is None:
+        return (0.0, 0.0)
+    return (
+        round(horizontal[1] - horizontal[0], 3),
+        round(vertical[1] - vertical[0], 3),
+    )

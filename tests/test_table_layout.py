@@ -110,3 +110,27 @@ def test_the_return_row_reads_undefined_until_the_function_returns():
     scene = StubScene({"total": None, "return": None})
     table = create_table111({"total": 19}, scene)
     assert table.get_rows()[-1][1].original_text == "Undefined"
+
+
+def label_positions(table) -> list[float]:
+    return [round(float(row[0].get_center()[1]), 3) for row in table.get_rows()]
+
+
+def test_rows_sit_at_a_fixed_pitch_whatever_the_cells_hold():
+    """Row positions must not depend on cell content.
+
+    Row height is the tallest cell in the row, so a value going from text to a
+    drawn structure -- or from "Undefined" to a result -- resizes its row, and a
+    vertically centred table shifts every other row to compensate. That reads as
+    the whole panel jumping, and no single-step check can see it.
+    """
+    names = {"a": None, "b": None, "c": None}
+    plain = create_table111({"a": 1, "b": 2, "c": 3}, StubScene(dict(names)))
+
+    tall = Dict(x=1)
+    drain(tall)
+    with_structure = create_table111(
+        {"a": 1, "b": tall, "c": 3}, StubScene(dict(names))
+    )
+
+    assert label_positions(plain) == label_positions(with_structure)

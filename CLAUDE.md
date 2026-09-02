@@ -139,6 +139,19 @@ mutating:
 Related trap: use at least two table rows in a layout test. A single row sits at
 y=0, which is exactly where a mislaid mobject lands, so the bug hides.
 
+### Motion bugs need a cross-step check
+
+Every probe invariant judges one settled step in isolation, so a frame can be
+correct on its own and still jump from the one before it. `verify.py` prints a
+**landmark drift** section comparing consecutive steps: the code panel, each row
+label and each structure must not move. The highlight and its target line are
+excluded, since moving is their job.
+
+Three reported artifacts -- a cell flying in from the right, and the panel
+shifting at two different steps -- were all invisible to the settled-frame sheet
+and to every invariant, and the drift table located all three on the first run.
+If a rendering complaint is about *movement*, read that table before anything else.
+
 ### Things that will bite you
 
 - **Instrumentation is env-gated and must stay inert.** `VISUAL_TRACE_LOG` turns
@@ -175,6 +188,20 @@ y=0, which is exactly where a mislaid mobject lands, so the bug hides.
   `stroke_width=0` lines running far wider than any cell. Every one made a
   correct frame look wrong. Use `probe.visible_range`, which counts only what
   actually puts ink on the frame.
+- **`.animate` snapshots its target when the builder is created**, not when it
+  plays. Cells are queued while user code runs and only positioned when
+  `create_table111` lays the table out, so an animation built with `.animate`
+  will drag its mobject back to wherever the previous table had it. Queue one of
+  the deferred builders in `data_structures/base.py` instead; the table realises
+  them once every cell is in its final place.
+- **New cells are built at the world origin**, so anything created after a layout
+  must be anchored to something already drawn — the previous cell, or the
+  placeholder when the container is empty. Forget this and the cell appears
+  wherever the container used to be.
+- **Row positions are pinned to a fixed pitch** (`table.ROW_PITCH`). MobjectTable
+  sizes each row to its tallest cell, so a value going from text to a drawn
+  structure resized its row and the centred table shifted every other row with
+  it. If you add a structure taller than the pitch, the drift table will say so.
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.

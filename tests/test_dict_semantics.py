@@ -7,6 +7,8 @@ the probe cannot reach.
 
 import manim as mn
 
+from stubs import realize
+
 from visual_trace.data_structures.dict import Dict
 
 
@@ -15,7 +17,7 @@ def highlighted_value_cells(d: Dict) -> list[int]:
     cells = {id(item[2]): index for index, item in enumerate(d.mobject.items)}
     return [
         cells[id(animation.mobject)]
-        for animation in d.animation_queue
+        for animation in realize(d.animation_queue)
         if id(animation.mobject) in cells
     ]
 
@@ -24,7 +26,7 @@ def highlighted_key_cells(d: Dict) -> list[int]:
     cells = {id(item[0]): index for index, item in enumerate(d.mobject.items)}
     return [
         cells[id(animation.mobject)]
-        for animation in d.animation_queue
+        for animation in realize(d.animation_queue)
         if id(animation.mobject) in cells
     ]
 

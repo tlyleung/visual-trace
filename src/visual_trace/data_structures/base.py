@@ -6,6 +6,31 @@ import manim as mn
 PLACEHOLDER_OPACITY = 0.35
 
 
+#
+# Deferred animation builders.
+#
+# `.animate` snapshots its target the moment the builder is created, but cells
+# are queued while user code runs and only positioned when `create_table111`
+# lays the table out. An animation built too early therefore interpolates its
+# mobject back to wherever the previous table had it -- a cell flying in from
+# offscreen. Queue one of these instead; the table realises them once everything
+# is in its final place. Taking the mobject as a parameter also gives each
+# closure its own binding, which a lambda written inside a loop would not have.
+#
+
+
+def fade_fill(mobject, opacity: float, color=None):
+    return lambda: mobject.animate.set_fill(color or mn.WHITE, opacity=opacity)
+
+
+def fade_stroke(mobject, opacity: float):
+    return lambda: mobject.animate.set_stroke(opacity=opacity)
+
+
+def shift_by(mobject, vector):
+    return lambda: mobject.animate.shift(vector)
+
+
 class Animated:
     """A data structure that narrates itself as it is used.
 
@@ -17,7 +42,10 @@ class Animated:
     Two queues make that work, and the scene drains both each step:
 
     ``animation_queue``
-        Animations to play. `create_table111` moves them onto the scene.
+        Animations to play, or zero-argument callables returning one.
+        `create_table111` moves them onto the scene, realising the callables
+        only after the table has positioned every cell -- see the deferred
+        builders above for why that matters.
 
     ``pending_operations``
         Mobject-tree mutations that must not happen yet. `create_table111`
@@ -72,9 +100,7 @@ class Animated:
     def _show_placeholder(self, visible: bool) -> None:
         """Queue the fade between empty and occupied."""
         target = PLACEHOLDER_OPACITY if visible else 0.0
-        self.animation_queue.append(
-            self.mobject.placeholder.animate.set_stroke(opacity=target)
-        )
+        self.animation_queue.append(fade_stroke(self.mobject.placeholder, target))
 
     def reset(self):
         """Return a fresh instance with the same initial arguments.

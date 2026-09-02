@@ -5,7 +5,7 @@ logic: two_sum's first `target - num in d` searches an empty dict, so the miss
 that sets up the whole algorithm drew nothing at all.
 """
 
-from stubs import drain, settle
+from stubs import drain, render_step, settle, visible_size
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 
@@ -79,7 +79,7 @@ def test_deleting_the_last_entry_brings_the_placeholder_back():
 
 
 def container_width(structure) -> float:
-    return round(float(structure.mobject.width), 3)
+    return visible_size(structure.mobject)[0]
 
 
 def test_the_dict_placeholder_overlaps_the_first_cell():
@@ -107,3 +107,29 @@ def test_the_list_placeholder_overlaps_the_first_cell():
     drain(nums)
     settle(nums)
     assert container_width(nums) == empty, "the list changed width when first filled"
+
+
+def test_the_first_cell_lands_where_the_placeholder_stood():
+    """After the table has moved the container, a new cell must follow it.
+
+    New cells are built at the world origin, so anything created *after* a
+    layout has to be anchored to what is already drawn. `List` anchors to its
+    last cell; the first cell of an empty container has only the placeholder,
+    which stands exactly where it should go.
+    """
+    for structure, name, fill in (
+        (Dict(), "d", lambda s: s.__setitem__("a", 1)),
+        (List(), "nums", lambda s: s.append(1)),
+    ):
+        drain(structure)
+        settle(structure)
+        render_step({"target": 9, name: structure})  # moves it into its cell
+        empty = visible_size(structure.mobject)
+
+        fill(structure)
+        render_step({"target": 9, name: structure})
+        filled = visible_size(structure.mobject)
+
+        assert filled == empty, (
+            f"{name} changed size when filled after a layout: {empty} -> {filled}"
+        )

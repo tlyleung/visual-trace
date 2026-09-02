@@ -175,6 +175,48 @@ def load_trace(out_dir: Path) -> list[dict]:
     return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
 
+STABLE = ("code", "label:", "struct:")
+
+
+def drift(records: list[dict], tol: float = 0.02) -> list[dict]:
+    """Landmarks that moved between one settled step and the next.
+
+    Every probe invariant judges a single step in isolation, so a frame can be
+    correct on its own and still jump from the one before it. Motion bugs live
+    exactly there: a mid-play fly-in ends in the right place, and a layout
+    reflow leaves every frame internally consistent. Only comparing steps sees
+    them.
+
+    The highlight and its target line are excluded -- moving is their job.
+    """
+    found = []
+    for previous, current in zip(records, records[1:]):
+        before = previous.get("geometry", {})
+        for key, box in current.get("geometry", {}).items():
+            if not key.startswith(STABLE) or key not in before:
+                continue
+            dx = box["left"] - before[key]["left"]
+            dy = box["top"] - before[key]["top"]
+            if abs(dx) > tol or abs(dy) > tol:
+                found.append(
+                    {"step": current["step"], "what": key, "dx": dx, "dy": dy}
+                )
+    return found
+
+
+def report_drift(records: list[dict]) -> int:
+    moved = drift(records)
+    print("\nlandmark drift between steps")
+    print("-" * 78)
+    if not moved:
+        print("  none -- nothing that should hold still moved")
+        return 0
+    for item in moved:
+        print(f"  step {item['step']:>2}  {item['what']:<16} "
+              f"moved dx={item['dx']:+.3f} dy={item['dy']:+.3f}")
+    return len(moved)
+
+
 def report(records: list[dict]) -> int:
     failures = 0
     print(f"\n{'step':>4} {'line':>4} {'c/a':>6}  source")
@@ -344,6 +386,7 @@ def main() -> int:
         print(f"\ngif:    {gif}")
 
     failures = report(records)
+    failures += report_drift(records)
     print(f"\nsheet:  {sheet}")
     print(f"trace:  {out_dir / 'trace.jsonl'}")
     print(f"video:  {scene.renderer.file_writer.movie_file_path}")

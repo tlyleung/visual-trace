@@ -2,6 +2,10 @@ import manim as mn
 
 from ..data_structures.base import Animated
 
+# Comfortably clears the tallest cell a structure draws, so a row never
+# has to grow and the rows below never have to move.
+ROW_PITCH = 1.15
+
 
 def create_table(scene: mn.Scene) -> mn.MobjectTable:
     table = mn.MobjectTable(
@@ -13,18 +17,20 @@ def create_table(scene: mn.Scene) -> mn.MobjectTable:
         arrange_in_grid_config={"cell_alignment": mn.LEFT},
     )
     table.align_to(scene.right_col, mn.LEFT)
+    _pin_rows(table)
     return table
 
 
 def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
     data = []
     applied = 0
+    deferred = []
     for name in scene.variables.keys():
         if name in local_vars:
             v = local_vars[name]
 
             if isinstance(v, Animated):
-                scene.animation_queue.extend(v.drain_animations())
+                deferred.extend(v.drain_animations())
                 # Apply deferred tree mutations before the table lays the
                 # mobject out. Carrying them past this point means the table
                 # arranges an empty group, and the contents then materialise at
@@ -46,6 +52,14 @@ def create_table111(local_vars: dict, scene: mn.Scene) -> mn.MobjectTable:
         arrange_in_grid_config={"cell_alignment": mn.LEFT},
     )
     table.align_to(scene.right_col, mn.LEFT)
+    _pin_rows(table)
+
+    # Now that every cell is in its final position, realise the animations that
+    # had to wait for it. Anything already an Animation reads the mobject's
+    # current state when it begins and is safe to pass through.
+    scene.animation_queue.extend(
+        item() if callable(item) else item for item in deferred
+    )
     scene.applied_operations = applied
     return table
 
@@ -65,3 +79,18 @@ def refresh_table(scene: mn.Scene, local_vars: dict) -> mn.MobjectTable:
     scene.add(new_table)
     scene.table = new_table
     return new_table
+
+
+def _pin_rows(table: mn.MobjectTable) -> None:
+    """Put every row label at a fixed y, centred as a block.
+
+    MobjectTable sizes each row to its tallest cell, so a value changing from
+    text to a drawn structure resizes that row and the centred table shifts
+    every other row with it -- the whole panel appears to jump. Pinning to the
+    labels keeps the layout independent of what the cells happen to hold.
+    """
+    rows = table.get_rows()
+    span = (len(rows) - 1) * ROW_PITCH
+    for index, row in enumerate(rows):
+        target = span / 2 - index * ROW_PITCH
+        row.shift(mn.UP * (target - float(row[0].get_center()[1])))

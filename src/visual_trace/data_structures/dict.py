@@ -1,6 +1,6 @@
 import manim as mn
 
-from .base import Animated
+from .base import Animated, fade_fill, shift_by
 
 
 class Dict(Animated, dict):
@@ -31,12 +31,13 @@ class Dict(Animated, dict):
         val_label.move_to(val_square.get_center())
 
         item = mn.VGroup(key_square, key_label, val_square, val_label)
-        # Only offset once there is something to sit beside. `next_to` an empty
-        # group puts the first cell's left edge on the origin, half a cell right
-        # of where the placeholder stands, so filling an empty dict would shift
-        # it sideways.
+        # Cells are built at the world origin, so a cell added after the table
+        # has moved the container must be anchored to something already drawn.
+        # The placeholder stands exactly where the first cell belongs.
         if len(self.mobject.items):
             item.next_to(self.mobject.items, mn.RIGHT, buff=0)
+        else:
+            item.move_to(self.mobject.placeholder)
 
         self.mobject.items.add(item)
 
@@ -54,31 +55,32 @@ class Dict(Animated, dict):
         animations = [mn.FadeOut(item)]
 
         for item in self.mobject.items[index:]:
-            animations.append(item.animate.shift(mn.LEFT / 2))
+            animations.append(shift_by(item, mn.LEFT / 2))
 
         return animations
 
     def __highlight_key_animation(self, index):
         key_square, _, _, _ = self.mobject.items[index]
         key_square.set_fill(mn.WHITE, opacity=0.5)
-        return [key_square.animate.set_fill(mn.WHITE, opacity=0.0)]
+        return [fade_fill(key_square, 0.0)]
 
     def __highlight_val_animation(self, index):
         _, _, val_square, _ = self.mobject.items[index]
         val_square.set_fill(mn.WHITE, opacity=0.5)
-        return [val_square.animate.set_fill(mn.WHITE, opacity=0.0)]
+        return [fade_fill(val_square, 0.0)]
 
     def __replace_val_animation(self, index, value):
         _, _, val_square, val_label = self.mobject.items[index]
         val_square.set_fill(mn.WHITE, opacity=1.0)
 
-        new_val_label = mn.Text(str(value), font_size=24).move_to(
-            val_square.get_center()
-        )
-
         return [
-            val_square.animate.set_fill(mn.WHITE, opacity=0.0),
-            mn.Transform(val_label, new_val_label),
+            fade_fill(val_square, 0.0),
+            # The replacement is positioned at play time too: building it now
+            # would aim at wherever the cell sits before the table lays out.
+            lambda: mn.Transform(
+                val_label,
+                mn.Text(str(value), font_size=24).move_to(val_square.get_center()),
+            ),
         ]
 
     def __search_animation(self, key, found: bool) -> list:
@@ -88,7 +90,7 @@ class Dict(Animated, dict):
             key_square, _, _, _ = self.mobject.items[index]
             key_square.set_fill(mn.WHITE, opacity=0.5)
             settled = 0.5 if found and candidate == key else 0.0
-            animations.append(key_square.animate.set_fill(mn.WHITE, opacity=settled))
+            animations.append(fade_fill(key_square, settled))
         return animations
 
     def __contains__(self, key):

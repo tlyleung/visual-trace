@@ -57,15 +57,28 @@ def _y_range(m) -> tuple[float, float]:
 
 
 def bbox(m) -> dict:
-    left, right = _x_range(m)
-    bottom, top = _y_range(m)
+    """Recorded bounds, measured on ink wherever there is any.
+
+    Raw Manim bounds count invisible geometry, which has produced a false
+    reading every time it has come up here. Falls back to the raw box only when
+    nothing in the mobject renders, so an empty container still reports a
+    position.
+    """
+    horizontal = visible_range(m, axis=0)
+    vertical = visible_range(m, axis=1)
+    if horizontal is None or vertical is None:
+        left, right = _x_range(m)
+        bottom, top = _y_range(m)
+    else:
+        left, right = horizontal
+        bottom, top = vertical
     return {
         "left": round(left, 4),
         "right": round(right, 4),
         "bottom": round(bottom, 4),
         "top": round(top, 4),
-        "width": round(float(m.width), 4),
-        "height": round(float(m.height), 4),
+        "width": round(right - left, 4),
+        "height": round(top - bottom, 4),
     }
 
 
@@ -356,6 +369,13 @@ def probe_step(scene, lineno: int, local_vars: dict) -> dict:
     for name, value in _tracked_structures(local_vars):
         if _drawn(value):
             geometry[f"struct:{name}"] = bbox(value.mobject)
+
+    # Row labels never legitimately move. Recorded so a cross-step check can
+    # catch layout drift, which no single-step invariant can see.
+    rows = scene.table.get_rows()
+    for index, name in enumerate(scene.variables):
+        if index < len(rows):
+            geometry[f"label:{name}"] = bbox(rows[index][0])
 
     checks: list[dict] = []
     for invariant in INVARIANTS:

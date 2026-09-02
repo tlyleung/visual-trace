@@ -1,6 +1,6 @@
 import manim as mn
 
-from .base import Animated
+from .base import Animated, fade_fill
 
 
 class List(Animated, list):
@@ -25,10 +25,13 @@ class List(Animated, list):
         cell = mn.VGroup(square, label)
 
         # Sit against the last drawn cell -- absolute placement would be wrong
-        # once the table has moved the group into its own cell -- then step over
-        # any cells queued in this same step that are not in the group yet.
+        # once the table has moved the group into its own cell -- or against the
+        # placeholder when there is no cell yet. Then step over any cells queued
+        # in this same step that are not in the group yet.
         if len(self.mobject.items):
             cell.next_to(self.mobject.items[-1], mn.RIGHT, buff=0)
+        else:
+            cell.move_to(self.mobject.placeholder)
         cell.shift(mn.RIGHT * (len(self.pending_operations) * 0.5))
 
         self.animation_queue.append(
@@ -43,7 +46,7 @@ class List(Animated, list):
             return []
         square, _ = self.mobject.items[index]
         square.set_fill(mn.WHITE, opacity=0.5)
-        return [square.animate.set_fill(mn.WHITE, opacity=0.0)]
+        return [fade_fill(square, 0.0)]
 
     #
     # List methods
