@@ -234,25 +234,24 @@ If a rendering complaint is about *movement*, read that table before anything el
 
 ### Known-failing invariants
 
-- `within_frame` fails on every step of `max_sub_array`. Nine cells is 4.5 units
-  wide, pushing the value column to x=7.494 against a frame edge of 7.111 -- the
-  last cell is clipped by roughly 52px at 1080p. Nothing in the layout adapts to a
-  container wider than its column. The fix belongs in `build_table`: scale an
-  oversized structure to fit its cell, so it covers whatever structure comes next
-  as well.
-
-Otherwise none. Every invariant is green on all three examples, so any failure is a
+None. Every invariant is green on all six examples, so any failure is a
 regression you just introduced, not background noise. Keep it that way: if you
 add an invariant that cannot pass yet, record it here with the reason.
 
-Note that `list_square_count` and `list_squares_contiguous` report nothing at all
-for `dict_operations`, which has no List in scope. An invariant with no subject is
-silent, not passing — read the per-invariant step counts, not just the absence of
-failures.
+An invariant with no subject is silent, not passing -- read the per-invariant
+step counts, not just the absence of failures.
 
-Other latent bugs, unrelated to rendering: `tracing.py` stores
-`variables[variable] = type(variable)` — the type of the *name string*, always
-`str`; only the keys are used downstream, so it is harmless but misleading.
-`utils/transform.py` is an entirely commented-out AST approach that would have
-rewritten `list` -> `List` automatically, and `build_table` still carries its
-placeholder name.
+### Known limits
+
+- The variables panel fits about **eight cells** across (4.117 units of value
+  column at `CELL_SIZE`). A longer container is drawn past the frame edge and
+  clipped; `within_frame` catches it. The fix belongs in `build_table` -- scale an
+  oversized structure to fit its cell -- so it covers whatever structure comes
+  next as well. `examples/max_sub_array.py` is sized to fit rather than working
+  around it.
+- One structure bound to two locals (`arr = nums`) puts a single mobject into two
+  table cells. Manim does not reparent, so the last placement wins and the other
+  row renders empty for the rest of the video.
+- `utils/transform.py` is an entirely commented-out AST approach that would have
+  rewritten `list` -> `List` automatically, so users would not have to. Until then
+  a plain `list` renders as flat text with no warning, which the README documents.
