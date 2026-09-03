@@ -307,6 +307,27 @@ def cell_count_matches(scene, lineno, local_vars) -> list[dict]:
     return checks
 
 
+def cell_values_match(scene, lineno, local_vars) -> list[dict]:
+    """Each cell must show what the container actually holds.
+
+    `cell_count_matches` only counts, so an operation that changes values without
+    changing length -- an assignment, a swap, a sort -- left the drawing showing
+    stale data with every invariant green. That is worse than drawing nothing.
+    """
+    checks = []
+    for name, value in _tracked(local_vars):
+        drawn = value.drawn_values()
+        expected = value.expected_values()
+        checks.append(
+            _check(
+                "cell_values_match",
+                drawn == expected,
+                f"{name}: drawn {drawn} vs held {expected}",
+            )
+        )
+    return checks
+
+
 def cells_contiguous(scene, lineno, local_vars) -> list[dict]:
     """Adjacent cells should touch; a growing gap means positioning is wrong."""
     checks = []
@@ -364,6 +385,7 @@ INVARIANTS = [
     panels_disjoint,
     within_frame,
     cell_count_matches,
+    cell_values_match,
     cells_contiguous,
     table_rows_disjoint,
     table_row_count,

@@ -1,28 +1,30 @@
 import manim as mn
 
-from .base import CELL_SIZE, Animated, fade_fill, shift_by
+from .base import CELL_SIZE, Animated
 
-# Which half of a cell to light: a cell is (key_square, key_label, val_square,
-# val_label), stacked vertically.
-KEY, VALUE = 0, 2
+# Slot indices for `Animated`'s cell primitives.
+KEY, VALUE = 0, 1
 
 
 class Dict(Animated, dict):
     """A dict that draws itself as a row of stacked key/value cells."""
 
+    # A cell is (key_square, key_label, val_square, val_label).
+    SLOTS = ((0, 1), (2, 3))
+    VALUE_SLOT = VALUE
+
     def __init__(self, **kwargs):
         dict.__init__(self, kwargs)
         Animated.__init__(self, mn.VMobject(), **kwargs)
         self._init_placeholder(rows=2)
-
         for key, value in kwargs.items():
             self.__draw(key, value)
 
     #
-    # Animation methods
+    # Drawing
     #
 
-    def __draw(self, key: object, value: object) -> None:
+    def __cell(self, key: object, value: object) -> mn.VGroup:
         key_square = mn.Square(
             side_length=CELL_SIZE, fill_color=mn.WHITE, fill_opacity=0.0
         )
@@ -30,108 +32,107 @@ class Dict(Animated, dict):
             side_length=CELL_SIZE, fill_color=mn.WHITE, fill_opacity=0.0
         )
         key_square.next_to(val_square, mn.UP, buff=0)
+        return mn.VGroup(
+            key_square,
+            mn.Text(str(key), font_size=24).move_to(key_square),
+            val_square,
+            mn.Text(str(value), font_size=24).move_to(val_square),
+        )
 
-        key_label = mn.Text(str(key), font_size=24).move_to(key_square)
-        val_label = mn.Text(str(value), font_size=24).move_to(val_square)
-
-        cell = mn.VGroup(key_square, key_label, val_square, val_label)
-        self._place_cell(cell)
-        self.mobject.items.add(cell)
-
-        for part in (key_square, key_label, val_square, val_label):
+    def __appear(self, cell: mn.VGroup) -> None:
+        for part in cell:
             self.queue(
                 mn.Create(part) if isinstance(part, mn.Square) else mn.FadeIn(part)
             )
 
-    def __highlight(self, index: int, slot: int, settled: float = 0.0) -> None:
-        """Light one half of a cell, settling at `settled` when the fade ends."""
-        square = self.mobject.items[index][slot]
-        square.set_fill(mn.WHITE, opacity=0.5)
-        self.queue_deferred(fade_fill(square, settled))
+    def __draw(self, key: object, value: object) -> None:
+        cell = self.__cell(key, value)
+        self._append_cell(cell)
+        self.__appear(cell)
 
-    def __search(self, key: object, found: bool) -> None:
-        """Sweep every key as if scanning, then settle on the outcome."""
-        for index, candidate in enumerate(dict.keys(self)):
-            self.__highlight(
-                index, KEY, settled=0.5 if found and candidate == key else 0.0
-            )
+    def __insert_at(self, index: int, key: object, value: object) -> None:
+        cell = self.__cell(key, value)
+        self._insert_cell(index, cell)
+        self.__appear(cell)
 
-    def __remove(self, index: int) -> None:
-        cell = self.mobject.items[index]
-        self.mobject.items.remove(cell)
-        self.queue(mn.FadeOut(cell))
-        for following in self.mobject.items[index:]:
-            self.queue_deferred(shift_by(following, mn.LEFT * CELL_SIZE))
+    def __sync(self) -> None:
+        """Bring the drawing back in line with the data, cell by cell.
 
-    def __replace_value(self, index: int, value: object) -> None:
-        _, _, val_square, val_label = self.mobject.items[index]
-        val_square.set_fill(mn.WHITE, opacity=1.0)
-        self.queue_deferred(fade_fill(val_square, 0.0))
-        # The replacement is positioned at play time too: building it now would
-        # aim at wherever the cell sits before the table lays out.
-        self.queue_deferred(
-            lambda: mn.Transform(
-                val_label,
-                mn.Text(str(value), font_size=24).move_to(val_square.get_center()),
-            )
-        )
+        The fallback for bulk changes -- `update`, `|=` -- where following each
+        individual insert would say less than showing the result.
+        """
+        while len(self.mobject.items) > len(self):
+            self._remove_cell(len(self.mobject.items) - 1)
+        for index, (key, value) in enumerate(dict.items(self)):
+            if index >= len(self.mobject.items):
+                self.__insert_at(index, key, value)
+                continue
+            cell = self.mobject.items[index]
+            if cell[1].original_text != str(key):
+                self._write(index, key, slot=KEY)
+            if cell[3].original_text != str(value):
+                self._write(index, value, slot=VALUE)
 
     def __index_of(self, key: object) -> int:
         return list(dict.keys(self)).index(key)
 
+    def __show(self, index: int) -> None:
+        self._light(index, KEY)
+        self._light(index, VALUE)
+
+    def drawn_values(self) -> list[str]:
+        return [
+            f"{cell[1].original_text}={cell[3].original_text}"
+            for cell in self.mobject.items
+        ]
+
+    def expected_values(self) -> list[str]:
+        # dict.items, not self: our own items() animates.
+        return [f"{key}={value}" for key, value in dict.items(self)]
+
     #
-    # Dict methods
+    # Reads
     #
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         """Show the search that `in` performs, hit or miss.
 
         A miss that drew nothing would be indistinguishable from a frame the
         tool forgot to render, so both outcomes sweep; only the settle differs.
         """
         found = dict.__contains__(self, key)
-        self.__search(key, found)
+        self._sweep(self.__index_of(key) if found else None, slot=KEY)
         return found
 
     def __getitem__(self, key):
-        """Highlight the key-value pair for the given key."""
-        if not dict.__contains__(self, key):
-            raise KeyError(f"Key {key} not found.")
-        index = self.__index_of(key)
-        self.__highlight(index, KEY)
-        self.__highlight(index, VALUE)
-        return dict.__getitem__(self, key)
-
-    def __setitem__(self, key, value):
-        if dict.__contains__(self, key):
-            index = self.__index_of(key)
-            dict.__setitem__(self, key, value)
-            self.__highlight(index, KEY)
-            self.__replace_value(index, value)
-        else:
-            dict.__setitem__(self, key, value)
-            self._sync_placeholder()
-            self.__draw(key, value)
-
-    def __delitem__(self, key):
         if not dict.__contains__(self, key):
             raise KeyError(key)
-        index = self.__index_of(key)
-        dict.__delitem__(self, key)
-        self.__remove(index)
-        self._sync_placeholder()
+        self.__show(self.__index_of(key))
+        return dict.__getitem__(self, key)
+
+    def __iter__(self):
+        """Light each key as it is handed out."""
+        for index, key in enumerate(list(dict.keys(self))):
+            self._light(index, KEY)
+            yield key
+
+    def get(self, key, default=None):
+        if not dict.__contains__(self, key):
+            self._sweep(None, slot=KEY)
+            return default
+        self.__show(self.__index_of(key))
+        return dict.__getitem__(self, key)
 
     def items(self):
         """Return an animated list of key-value pairs."""
-        for index, (key, value) in enumerate(dict.items(self)):
-            self.__highlight(index, KEY)
-            self.__highlight(index, VALUE)
+        for index, (key, value) in enumerate(list(dict.items(self))):
+            self.__show(index)
             yield key, value
 
     def keys(self):
         """Return an animated list of keys."""
-        for index, key in enumerate(dict.keys(self)):
-            self.__highlight(index, KEY)
+        for index, key in enumerate(list(dict.keys(self))):
+            self._light(index, KEY)
             yield key
 
     def values(self):
@@ -141,11 +142,76 @@ class Dict(Animated, dict):
         returns the first match, so a repeated value would re-highlight the
         earlier cell and never its own.
         """
-        for index, value in enumerate(dict.values(self)):
-            self.__highlight(index, VALUE)
+        for index, value in enumerate(list(dict.values(self))):
+            self._light(index, VALUE)
             yield value
 
-    def clear(self):
+    #
+    # Writes
+    #
+
+    def __setitem__(self, key, value) -> None:
+        if dict.__contains__(self, key):
+            index = self.__index_of(key)
+            dict.__setitem__(self, key, value)
+            self._light(index, KEY)
+            self._write(index, value)
+            return
+        dict.__setitem__(self, key, value)
+        self._sync_placeholder()
+        self.__draw(key, value)
+
+    def setdefault(self, key, default=None):
+        if dict.__contains__(self, key):
+            self.__show(self.__index_of(key))
+            return dict.__getitem__(self, key)
+        self[key] = default
+        return default
+
+    def update(self, *args, **kwargs) -> None:
+        dict.update(self, *args, **kwargs)
+        self._sync_placeholder()
+        self.__sync()
+
+    def __ior__(self, other):
+        self.update(other)
+        return self
+
+    #
+    # Removals
+    #
+
+    def __delitem__(self, key) -> None:
+        if not dict.__contains__(self, key):
+            raise KeyError(key)
+        index = self.__index_of(key)
+        dict.__delitem__(self, key)
+        self._remove_cell(index)
+        self._sync_placeholder()
+
+    def pop(self, key, *default):
+        if not dict.__contains__(self, key):
+            self._sweep(None, slot=KEY)
+            if default:
+                return default[0]
+            raise KeyError(key)
+        index = self.__index_of(key)
+        self._sweep(index, slot=KEY)
+        value = dict.pop(self, key)
+        self._remove_cell(index)
+        self._sync_placeholder()
+        return value
+
+    def popitem(self):
+        if not len(self):
+            raise KeyError("popitem(): dictionary is empty")
+        index = len(self) - 1
+        item = dict.popitem(self)
+        self._remove_cell(index)
+        self._sync_placeholder()
+        return item
+
+    def clear(self) -> None:
         """Clear all items from the dict and animate their removal.
 
         Empties the attached group rather than rebinding the attribute to a new
@@ -165,3 +231,20 @@ class Dict(Animated, dict):
             )
         dict.clear(self)
         self._sync_placeholder()
+
+    #
+    # Derived containers stay animated
+    #
+
+    def copy(self):
+        """A drawn copy. Built by assignment so non-identifier keys survive --
+        `__init__` only takes keyword arguments."""
+        clone = type(self)()
+        for key, value in dict.items(self):
+            clone[key] = value
+        return clone
+
+    def __or__(self, other):
+        clone = self.copy()
+        clone.update(other)
+        return clone

@@ -42,6 +42,28 @@ empty dict animated nothing at all.
 The variables table reserves a `return` row from the first frame, filled in by
 `flush`. Reserving it keeps the row set stable so nothing shifts at the end.
 
+Every overridden container method reduces to one of five primitives on
+`Animated` — `_light`, `_sweep`, `_write`, `_insert_cell`, `_remove_cell` — plus
+`_relayout`, which sends every cell to its slot after a structural change.
+Subclasses describe their cell shape with `SLOTS` and `VALUE_SLOT` and otherwise
+just wire methods to those. Adding a method should not mean designing an
+animation.
+
+**Nothing is inherited usefully.** `list` and `dict` methods are pure C on the
+internal array and never route through a Python-level override — overriding
+`__setitem__` does not make `sort()` animate. The only exceptions are external
+consumers: `sorted(s)`/`list(s)` go through `__iter__`, and `dict(s)`/`d.copy()`
+through `__getitem__`. Any method left inherited silently desyncs the drawing
+from the data, which is what `cell_values_match` exists to catch.
+
+Two are left inherited on purpose:
+
+- **`__len__`** is O(1) and never reads the elements, so animating it would teach
+  that it scans. It is also called by `probe.cell_count_matches` twice a step, so
+  an override would have the verification tool corrupt what it measures.
+- **`__eq__`, `__lt__` and friends** are full scans whose animation would be
+  noise rather than signal.
+
 `data_structures/base.py:Animated` is the contract they share, and is what a new
 structure (Stack, Queue, Tree, Graph) should be built on. It owns `mobject`, the
 two queues, and `reset()`; the scene tests `isinstance(v, Animated)` rather than
@@ -209,28 +231,6 @@ If a rendering complaint is about *movement*, read that table before anything el
 - Probe reads must stay side-effect free. `repr()` on `Dict` is safe (it goes
   through the C implementation, not the overridden `items`/`keys`/`values`), but
   anything calling those methods would push spurious animations.
-
-### Known gaps
-
-`tests/test_empty_state.py` carries one `xfail`: inserting into a `Dict` between
-a removal and the next settle leaves a cell-width hole, because the removal's
-left-shift of the survivors is a deferred *animation* and has not been applied
-when the new cell anchors to its neighbour. Placing cells at an exact multiple of
-`CELL_SIZE` fixes it but assumes no cell is ever wider than its square, and moves
-existing renders by a few anti-aliased pixels. No example deletes and inserts
-between settles, so it is recorded rather than fixed.
-
-Two more, both recorded rather than fixed because fixing them changes behaviour
-rather than correcting it:
-
-- Only `append`/`__getitem__` on `List` and `__setitem__`/`__delitem__`/`clear`
-  on `Dict` are overridden. `pop`, `insert`, `extend`, `update` and friends
-  inherit the C implementation and mutate the container without touching
-  `mobject.items`, so the drawing silently disagrees with the data.
-  `cell_count_matches` now catches this for both containers.
-- One structure bound to two locals (`arr = nums`) puts a single mobject into two
-  table cells. Manim does not reparent, so the last placement wins and the other
-  row renders empty for the rest of the video.
 
 ### Known-failing invariants
 

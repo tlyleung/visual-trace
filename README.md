@@ -25,6 +25,21 @@ uv run scripts/cli.py examples/max_sub_array.py
 | Tree           | ❌          |                                                  |
 | Graph          | ❌          |                                                  |
 
+Reads, writes, insertions and removals all animate. Anything left inherited from
+the builtin would desync the drawing from the data, so `cell_values_match` fails
+the render rather than letting it show stale values.
+
+## Examples
+
+| Example | Shows |
+| ------- | ----- |
+| [`two_sum`](examples/two_sum.py) | dict lookups, membership sweeps |
+| [`max_sub_array`](examples/max_sub_array.py) | iterating a list |
+| [`bubble_sort`](examples/bubble_sort.py) | in-place swaps |
+| [`binary_search`](examples/binary_search.py) | indexed reads |
+| [`list_operations`](examples/list_operations.py) | appends |
+| [`dict_operations`](examples/dict_operations.py) | values(), clear() |
+
 ## Implementation
 
 See [CLAUDE.md](CLAUDE.md) for how tracing, the animation queue, and the

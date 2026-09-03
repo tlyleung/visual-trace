@@ -5,28 +5,22 @@ logic: two_sum's first `target - num in d` searches an empty dict, so the miss
 that sets up the whole algorithm drew nothing at all.
 """
 
-import pytest
-
 from stubs import drain, render_step, settle, visible_size
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 
-
 def placeholder_opacity(structure) -> float:
     return round(float(structure.mobject.placeholder[0].get_stroke_opacity()), 2)
-
 
 def test_an_empty_dict_draws_something():
     d = Dict()
     assert d.mobject.family_members_with_points(), "an empty dict drew nothing"
     assert placeholder_opacity(d) > 0
 
-
 def test_an_empty_list_draws_something():
     nums = List()
     assert nums.mobject.family_members_with_points(), "an empty list drew nothing"
     assert placeholder_opacity(nums) > 0
-
 
 def test_a_populated_dict_shows_no_placeholder():
     d = Dict(a=1)
@@ -34,13 +28,11 @@ def test_a_populated_dict_shows_no_placeholder():
     settle(d)
     assert placeholder_opacity(d) == 0
 
-
 def test_a_populated_list_shows_no_placeholder():
     nums = List(1, 2)
     drain(nums)
     settle(nums)
     assert placeholder_opacity(nums) == 0
-
 
 def test_the_first_entry_hides_the_placeholder():
     d = Dict()
@@ -50,7 +42,6 @@ def test_the_first_entry_hides_the_placeholder():
     settle(d)
     assert placeholder_opacity(d) == 0
 
-
 def test_the_first_append_hides_the_placeholder():
     nums = List()
     settle(nums)
@@ -58,7 +49,6 @@ def test_the_first_append_hides_the_placeholder():
     drain(nums)
     settle(nums)
     assert placeholder_opacity(nums) == 0
-
 
 def test_clearing_brings_the_placeholder_back():
     d = Dict(a=1)
@@ -69,7 +59,6 @@ def test_clearing_brings_the_placeholder_back():
     settle(d)
     assert placeholder_opacity(d) > 0
 
-
 def test_deleting_the_last_entry_brings_the_placeholder_back():
     d = Dict(a=1)
     drain(d)
@@ -79,10 +68,8 @@ def test_deleting_the_last_entry_brings_the_placeholder_back():
     settle(d)
     assert placeholder_opacity(d) > 0
 
-
 def container_width(structure) -> float:
     return visible_size(structure.mobject)[0]
-
 
 def test_the_dict_placeholder_overlaps_the_first_cell():
     """Filling an empty container must not move or widen it.
@@ -99,7 +86,6 @@ def test_the_dict_placeholder_overlaps_the_first_cell():
     settle(d)
     assert container_width(d) == empty, "the dict changed width when first filled"
 
-
 def test_the_list_placeholder_overlaps_the_first_cell():
     nums = List()
     drain(nums)
@@ -109,7 +95,6 @@ def test_the_list_placeholder_overlaps_the_first_cell():
     drain(nums)
     settle(nums)
     assert container_width(nums) == empty, "the list changed width when first filled"
-
 
 def test_the_first_cell_lands_where_the_placeholder_stood():
     """After the table has moved the container, a new cell must follow it.
@@ -136,7 +121,6 @@ def test_the_first_cell_lands_where_the_placeholder_stood():
             f"{name} changed size when filled after a layout: {empty} -> {filled}"
         )
 
-
 def test_a_three_row_placeholder_stacks_without_overlapping():
     """`_init_placeholder(rows=n)` is the extension point for new structures.
 
@@ -160,20 +144,12 @@ def test_a_three_row_placeholder_stacks_without_overlapping():
     assert gaps == [0.5, 0.5], f"squares are not stacked contiguously: {gaps}"
     assert centres[-1] == 0.0, "the bottom square should sit on the origin"
 
-
-@pytest.mark.xfail(
-    reason="known gap: a removal's left-shift of the survivors is a deferred "
-    "animation, so a cell inserted before the next settle anchors to geometry "
-    "that has not moved yet. Placing cells at an exact multiple of CELL_SIZE "
-    "instead would fix it, but assumes no cell is ever wider than its square. "
-    "Unreachable today -- no example deletes and inserts between settles.",
-    strict=True,
-)
 def test_a_cell_added_after_a_removal_lands_in_the_freed_slot():
     """Removals shift the survivors, and that shift is deferred.
 
-    Anchoring a new cell to the previous cell's *current* position therefore
-    reads geometry that is about to move, leaving a cell-width hole in the row.
+    Anchoring a new cell to the previous cell's *current* position reads geometry
+    that is about to move, leaving a cell-width hole. `_relayout` resolves every
+    slot after the layout instead, so the two cannot disagree.
     """
     d = Dict(a=1, b=2, c=3)
     drain(d)
