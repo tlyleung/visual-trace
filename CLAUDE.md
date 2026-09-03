@@ -49,6 +49,22 @@ Subclasses describe their cell shape with `SLOTS` and `VALUE_SLOT` and otherwise
 just wire methods to those. Adding a method should not mean designing an
 animation.
 
+**Plain `list` and `dict` are rewritten before the module runs.**
+`utils/transform.py` replaces literals, comprehensions and constructor calls with
+`List`/`Dict`, and `utils/loader.py` compiles the result **against the original
+filename, never through `ast.unparse`**. Node locations survive, so
+`inspect.getsource` still reads the user's file and `frame.f_lineno` still points
+at the line they wrote — the code panel and the tracer's line arithmetic know
+nothing about any of it. `List` and `Dict` are seeded into the exec globals
+rather than injected as an import node, which is the one change that could
+disturb that numbering.
+
+The rewriter never visits bare `Name` nodes, which is what keeps
+`isinstance(x, list)` correct — `List` is a subclass, so rewriting the second
+argument would narrow the test. There is no guard for this; the property comes
+from the design, and `tests/test_transform.py` fails if a `visit_Name` is ever
+added.
+
 **Nothing is inherited usefully.** `list` and `dict` methods are pure C on the
 internal array and never route through a Python-level override — overriding
 `__setitem__` does not make `sort()` animate. The only exceptions are external
@@ -245,13 +261,15 @@ step counts, not just the absence of failures.
 
 - The variables panel fits about **eight cells** across (4.117 units of value
   column at `CELL_SIZE`). A longer container is drawn past the frame edge and
-  clipped; `within_frame` catches it. The fix belongs in `build_table` -- scale an
+  clipped; `within_frame` catches it. Past `MAX_DRAWN_CELLS` a container is not
+  drawn at all and shows as text -- a cell costs a Manim mobject, and the AST
+  rewriter makes it easy to construct a thousand of them by accident. The fix belongs in `build_table` -- scale an
   oversized structure to fit its cell -- so it covers whatever structure comes
   next as well. `examples/max_sub_array.py` is sized to fit rather than working
   around it.
 - One structure bound to two locals (`arr = nums`) puts a single mobject into two
   table cells. Manim does not reparent, so the last placement wins and the other
   row renders empty for the rest of the video.
-- `utils/transform.py` is an entirely commented-out AST approach that would have
-  rewritten `list` -> `List` automatically, so users would not have to. Until then
-  a plain `list` renders as flat text with no warning, which the README documents.
+- The rewriter only reaches the traced module. A helper imported from elsewhere
+  keeps its plain containers, and so does anything returned by `sorted`,
+  `json.loads` or a third-party call.

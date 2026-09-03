@@ -30,11 +30,15 @@ class List(Animated, list):
         self.queue(mn.AnimationGroup(mn.Create(cell[0]), mn.FadeIn(cell[1])))
 
     def __draw(self, value: object) -> None:
+        if not self.is_drawable():
+            return
         cell = self.__cell(value)
         self._append_cell(cell)
         self.__appear(cell)
 
     def __insert_at(self, index: int, value: object) -> None:
+        if not self.is_drawable():
+            return
         cell = self.__cell(value)
         self._insert_cell(index, cell)
         self.__appear(cell)

@@ -5,6 +5,11 @@ import manim as mn
 CELL_SIZE = 0.5
 PLACEHOLDER_OPACITY = 0.35
 
+# Past this many elements a container is shown as text rather than cells. Each
+# cell builds a Manim Text (~9ms), and the panel only fits about eight across
+# anyway, so a large container costs a great deal to draw and says nothing.
+MAX_DRAWN_CELLS = 32
+
 
 #
 # Deferred animation builders.
@@ -163,9 +168,16 @@ class Animated:
 
         self.mobject.placeholder = mn.VGroup(*squares)
         self.mobject.add(self.mobject.placeholder)
+        # Decided once, from the size it was built at: a container that starts
+        # too large never pays for cells at all.
+        self._drawable = len(self) <= MAX_DRAWN_CELLS
         self._was_empty = not len(self)
         if not self._was_empty:
             self.mobject.placeholder.set_stroke(opacity=0.0)
+
+    def is_drawable(self) -> bool:
+        """Whether this container is drawn as cells, or shown as text."""
+        return getattr(self, "_drawable", True)
 
     def _place_cell(self, cell: mn.Mobject) -> None:
         """Position a new cell in the next slot of the row.
@@ -250,6 +262,8 @@ class Animated:
 
     def _append_cell(self, cell) -> None:
         """Add a cell at the end, relaying out if the row is mid-change."""
+        if not self.is_drawable():
+            return
         self._place_cell(cell)
         self.mobject.items.add(cell)
         if self._pending_relayout:

@@ -109,7 +109,9 @@ def _tracked(local_vars: dict, container: type = object) -> list[tuple[str, Any]
     return [
         (n, v)
         for n, v in local_vars.items()
-        if isinstance(v, Animated) and isinstance(v, container)
+        if isinstance(v, Animated)
+        and isinstance(v, container)
+        and v.is_drawable()
     ]
 
 

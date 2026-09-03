@@ -13,11 +13,20 @@ class Dict(Animated, dict):
     SLOTS = ((0, 1), (2, 3))
     VALUE_SLOT = VALUE
 
-    def __init__(self, **kwargs):
-        dict.__init__(self, kwargs)
-        Animated.__init__(self, mn.VMobject(), **kwargs)
+    def __init__(self, mapping=None, **kwargs):
+        """`dict`'s own signature.
+
+        Keyword-only construction cannot express a non-identifier key, which
+        rules out `{1: "x"}` and `dict(m)` -- both of which the AST rewriter has
+        to be able to emit.
+        """
+        contents = dict(mapping or {}, **kwargs)
+        dict.__init__(self, contents)
+        # Passed as one positional mapping so `reset()` rebuilds it whatever the
+        # keys look like.
+        Animated.__init__(self, mn.VMobject(), contents)
         self._init_placeholder(rows=2)
-        for key, value in kwargs.items():
+        for key, value in contents.items():
             self.__draw(key, value)
 
     #
@@ -46,11 +55,15 @@ class Dict(Animated, dict):
             )
 
     def __draw(self, key: object, value: object) -> None:
+        if not self.is_drawable():
+            return
         cell = self.__cell(key, value)
         self._append_cell(cell)
         self.__appear(cell)
 
     def __insert_at(self, index: int, key: object, value: object) -> None:
+        if not self.is_drawable():
+            return
         cell = self.__cell(key, value)
         self._insert_cell(index, cell)
         self.__appear(cell)
@@ -237,12 +250,7 @@ class Dict(Animated, dict):
     #
 
     def copy(self):
-        """A drawn copy. Built by assignment so non-identifier keys survive --
-        `__init__` only takes keyword arguments."""
-        clone = type(self)()
-        for key, value in dict.items(self):
-            clone[key] = value
-        return clone
+        return type(self)(dict(dict.items(self)))
 
     def __or__(self, other):
         clone = self.copy()

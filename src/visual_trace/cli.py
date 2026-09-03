@@ -22,6 +22,12 @@ def main():
         help="render quality (default: low_quality, 854x480 -- the code listing "
         "is drawn small and is hard to read below medium)",
     )
+    parser.add_argument(
+        "--no-rewrite",
+        action="store_true",
+        help="take the script's `list` and `dict` literally instead of "
+        "rewriting them into animated containers",
+    )
     args = parser.parse_args()
 
     if not args.script.is_file():
@@ -29,7 +35,7 @@ def main():
         sys.exit(1)
 
     try:
-        func, func_args = load_target(args.script)
+        func, func_args = load_target(args.script, not args.no_rewrite)
     except AttributeError as exc:
         print(f"Error: {exc}")
         sys.exit(1)

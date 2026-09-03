@@ -90,3 +90,32 @@ def test_deleting_a_missing_key_raises_key_error():
     d = Dict(a=1)
     with pytest.raises(KeyError):
         del d["zzz"]
+
+
+def test_dict_accepts_a_mapping_positionally():
+    """`dict`'s own signature, so a rewriter can emit `Dict({...})`.
+
+    Keyword-only construction cannot express a non-identifier key, which rules
+    out `{1: "x"}` and `dict(m)` entirely.
+    """
+    from stubs import drain, settle
+
+    d = Dict({1: "x", 2: "y"})
+    assert dict(dict.items(d)) == {1: "x", 2: "y"}
+    drain(d)
+    settle(d)
+    assert d.drawn_values() == ["1=x", "2=y"]
+
+
+def test_a_mapping_and_keywords_merge():
+    d = Dict({"a": 1}, b=2)
+    assert dict(dict.items(d)) == {"a": 1, "b": 2}
+
+
+def test_a_dict_built_from_a_mapping_still_resets():
+    """`reset()` rebuilds arguments between the two tracing passes."""
+    d = Dict({1: "x"})
+    d[2] = "y"
+    fresh = d.reset()
+    assert dict(dict.items(fresh)) == {1: "x"}
+    assert fresh is not d

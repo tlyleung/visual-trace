@@ -19,55 +19,64 @@ ffmpeg -version    # apt install ffmpeg / brew install ffmpeg
 ## Usage
 
 A script to be traced defines `main()`, returning the function to trace and the
-arguments to trace it with:
+arguments to trace it with. Write ordinary Python:
 
 ```python
-from visual_trace.data_structures.list import List
-
-
-def max_sub_array(nums: List[int]) -> int:
-    ans = float("-inf")
-    curr = float("-inf")
-    for num in nums:
-        curr = max(curr + num, num)
-        ans = max(ans, curr)
-    return ans
+def two_sum(nums, target):
+    seen = {}
+    for i in range(len(nums)):
+        num = nums[i]
+        if target - num in seen:
+            return seen[target - num], i
+        seen[num] = i
 
 
 def main():
-    return max_sub_array, (List(-2, 1, -3, 4, -1, 2, 1, -5),)
+    return two_sum, ([2, 7, 11, 15], 9)
 ```
 
 ```bash
-uv run visual-trace examples/max_sub_array.py
-uv run visual-trace examples/max_sub_array.py --quality high_quality
+uv run visual-trace examples/two_sum_plain.py
+uv run visual-trace examples/two_sum_plain.py --quality high_quality
 ```
 
 The video lands in `media/videos/`. The default is 854x480, which is fine as a
 smoke test but too small to read the code listing — use `--quality
 high_quality` for anything you intend to watch.
 
-## Use `List` and `Dict`, not `list` and `dict`
+## How your containers get animated
 
-This is the one thing to get right. `visual_trace`'s containers subclass the
-builtins and override their methods so that ordinary use draws itself — indexing
-lights a cell, `in` sweeps the keys, a write transforms the label. The animation
-falls out of the algorithm's own data access rather than being scripted.
+`list` and `dict` are rewritten into animated containers before your code runs,
+so `[2, 7, 11, 15]` draws as a row of cells and `{}` as stacked key/value cells.
+Indexing lights a cell, `in` sweeps the keys, a write transforms the label — the
+animation falls out of your code's own data access rather than being scripted.
+
+The rewrite happens on the syntax tree and is compiled against your original
+file, so **the code panel shows exactly what you wrote**, not the rewrite, and
+line numbers line up.
+
+You can still use the containers directly if you prefer, and both examples in
+`examples/` do:
 
 ```python
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
 
-nums = List(2, 7, 11, 15)     # drawn as cells, and animates
-seen = Dict(a=1)              # drawn as stacked key/value cells
+nums = List(2, 7, 11, 15)
 ```
 
-**A plain `list` or `dict` still works, but is not animated.** It renders in the
-variables panel as flat text, with no error and no warning — so if your array
-shows up as `[2, 7, 11, 15]` instead of a row of boxes, this is why. Everything
-else (ints, floats, strings, tuples) is expected to render as text.
+Pass `--no-rewrite` to have your `list` and `dict` taken literally.
 
-Only these two containers exist today. Anything else you pass is shown as text.
+### What the rewrite does not reach
+
+- **Other modules.** Only the traced file is rewritten, so a helper imported from
+  elsewhere keeps its plain containers and they render as text.
+- **Containers built by something else.** `sorted(...)`, `json.loads(...)` and
+  third-party returns are plain, and render as text.
+- **Modules that use `list` or `dict` as a name of their own.** The whole file is
+  left alone rather than guessing at scope.
+- **Anything over 32 elements** renders as text: each cell costs a Manim
+  mobject, and the panel only fits about eight across anyway.
 
 ## Data Structures
 
@@ -89,6 +98,7 @@ the render rather than letting it show stale values.
 | Example | Shows |
 | ------- | ----- |
 | [`two_sum`](examples/two_sum.py) | dict lookups, membership sweeps |
+| [`two_sum_plain`](examples/two_sum_plain.py) | the same, written with plain `list`/`dict` |
 | [`max_sub_array`](examples/max_sub_array.py) | iterating a list |
 | [`bubble_sort`](examples/bubble_sort.py) | in-place swaps |
 | [`binary_search`](examples/binary_search.py) | indexed reads |
@@ -98,7 +108,8 @@ the render rather than letting it show stale values.
 ## Known limits
 
 - The variables panel fits about **eight cells** across. A longer container is
-  drawn past the right edge of the frame and clipped.
+  drawn past the right edge of the frame and clipped, and past 32 elements it is
+  shown as text instead.
 - A traced function runs **twice** — once to collect variable names, once to
   animate — so it should not have side effects outside its arguments.
 - Only integer indices animate; slice assignment redraws rather than animating

@@ -29,7 +29,11 @@ def build_table(
                 # arranges an empty group, and the contents then materialise at
                 # the origin instead of in the cell they were assigned.
                 applied += v.apply_pending()
-                mobject = v.mobject
+                mobject = (
+                    v.mobject
+                    if v.is_drawable()
+                    else mn.Text(str(v), font_size=24)
+                )
 
             else:
                 mobject = mn.Text(str(v), font_size=24)
