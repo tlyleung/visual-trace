@@ -4,13 +4,13 @@ Renders a Python function as a Manim video: a highlight bar walks down the sourc
 listing on the left while a variables table updates on the right.
 
 ```bash
-uv run scripts/cli.py examples/max_sub_array.py   # render
+uv run visual-trace examples/max_sub_array.py     # render
 uv run scripts/verify.py examples/two_sum.py      # render + check
 ```
 
 ## How it works
 
-`scripts/cli.py` loads a user script that must define `main() -> (func, args)`,
+`visual_trace/cli.py` loads a user script that must define `main() -> (func, args)`,
 then renders `scenes/base.py:Animation` over it.
 
 `Animation.construct` runs the traced function **twice**:

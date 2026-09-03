@@ -1,7 +1,7 @@
 [project]
 name = "visual-trace"
 version = "0.1.0"
-description = "Add your description here"
+description = "Render a Python function's execution as an animated video"
 readme = "README.md"
 authors = [
     { name = "Timothy Leung", email = "timothyleung@gmail.com" }
@@ -10,6 +10,9 @@ requires-python = ">=3.12"
 dependencies = [
     "manim>=0.19.0",
 ]
+
+[project.scripts]
+visual-trace = "visual_trace.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]

@@ -11,7 +11,8 @@ def max_sub_array(nums: List[int]) -> int:
 
 
 def main():
-    args = (List(-2, 1, -3, 4, -1, 2, 1, -5, 4),)
+    # Eight cells is what fits the variables panel; a ninth clips.
+    args = (List(-2, 1, -3, 4, -1, 2, 1, -5),)
     func = max_sub_array
     return func, args
 
