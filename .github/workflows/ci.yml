@@ -37,12 +37,13 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      # As above, plus ffmpeg: manim ships rendering wheels but shells out to it.
+      # As above, plus the binaries verify.py shells out to: ffmpeg for frame
+      # extraction, and ImageMagick for convert/montage/compare.
       - name: Install build and render dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            pkg-config libcairo2-dev libpango1.0-dev ffmpeg
+            pkg-config libcairo2-dev libpango1.0-dev ffmpeg imagemagick
       - run: uv sync --locked
       # verify.py exits non-zero if any probe invariant or the drift check
       # fails, so this gates on the render itself, not just on it completing.

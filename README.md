@@ -152,6 +152,11 @@ uv run pytest tests/ -q                        # fast geometry checks
 uv run scripts/verify.py examples/two_sum.py   # full render + probe
 ```
 
+`verify.py` needs ImageMagick as well as ffmpeg -- it shells out to `convert`,
+`montage` and `compare` to build the contact sheet and pixel diffs
+(`apt install imagemagick` / `brew install imagemagick`). The tool itself needs
+only ffmpeg.
+
 CI runs the tests on 3.12 and 3.13, builds the package, and renders an example
 under the probe -- `verify.py` exits non-zero if any invariant or the
 landmark-drift check fails, so a visual regression breaks the build.
