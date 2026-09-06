@@ -3,6 +3,8 @@
 Render a Python function's execution as an animated video: a highlight walks the
 source listing while the variables update alongside it.
 
+[![CI](https://github.com/tlyleung/visual-trace/actions/workflows/ci.yml/badge.svg)](https://github.com/tlyleung/visual-trace/actions/workflows/ci.yml)
+
 ![A traced run of two_sum: a highlight bar walks down the source listing on the
 left while a variables table on the right updates, with nums drawn as a row of
 cells and d as stacked key/value cells](docs/demo.gif)
@@ -15,12 +17,12 @@ fall out of the code's own data access.
 ## Installation
 
 ```bash
-uv tool install visual-trace     # or: pipx install visual-trace
+uv tool install git+https://github.com/tlyleung/visual-trace
 ```
 
-That puts a `visual-trace` command on your `PATH`. To work on Visual Trace
-itself, clone the repo and run `uv sync` instead -- see
-[Contributing](#contributing).
+That puts a `visual-trace` command on your `PATH`; `pipx install git+https://github.com/tlyleung/visual-trace`
+works too. To work on Visual Trace itself, clone the repo and run `uv sync`
+instead -- see [Contributing](#contributing).
 
 Manim ships its own rendering wheels, but shells out to **ffmpeg**, which you
 need on your `PATH`:
