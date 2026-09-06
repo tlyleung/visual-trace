@@ -55,20 +55,7 @@ The rewrite happens on the syntax tree and is compiled against your original
 file, so **the code panel shows exactly what you wrote**, not the rewrite, and
 line numbers line up.
 
-You can still name the containers directly if you prefer. Importing them is
-not a conflict -- the rewrite seeds the same two objects into your module, so
-your import simply rebinds them, and your plain literals are still rewritten
-around it:
-
-```python
-from visual_trace.data_structures.dict import Dict
-from visual_trace.data_structures.list import List
-
-nums = List(2, 7, 11, 15)
-```
-
-Nothing in `examples/` needs to, so none of them do. Pass `--no-rewrite` to have
-your `list` and `dict` taken literally instead.
+Nothing in `examples/` names `List` or `Dict`, and neither should your code.
 
 ### What the rewrite does not reach
 
@@ -80,6 +67,29 @@ your `list` and `dict` taken literally instead.
   left alone rather than guessing at scope.
 - **Anything over 32 elements** renders as text: each cell costs a Manim
   mobject, and the panel only fits about eight across anyway.
+
+For the first two you can reach for the containers by hand, which is the only
+way to animate something the rewrite never sees. A helper module that imports
+them itself hands back a container that animates in the traced function:
+
+```python
+from visual_trace.data_structures.list import List
+
+
+def build():
+    return List(3, 1, 2)
+```
+
+Importing them in the traced file is not a conflict either -- the rewrite seeds
+the same two objects into your module, so your import just rebinds them and your
+plain literals are still rewritten around it.
+
+**`List` takes elements, not an iterable.** It is varargs, so `List(xs)` is a
+one-element list holding `xs` -- splat it, `List(*xs)`. `Dict` has no such
+catch; it mirrors `dict`'s own signature. The rewrite emits the splat for you,
+which is why this only bites on the hand-written path.
+
+Pass `--no-rewrite` to have your `list` and `dict` taken literally instead.
 
 ## Data Structures
 
