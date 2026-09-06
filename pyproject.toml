@@ -7,6 +7,21 @@ authors = [
     { name = "Timothy Leung", email = "timothyleung@gmail.com" }
 ]
 requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+keywords = ["animation", "manim", "visualization", "tracing", "education", "algorithms"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Software Development :: Debuggers",
+]
 dependencies = [
     "manim>=0.19.0",
 ]

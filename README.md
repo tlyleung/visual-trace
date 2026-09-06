@@ -6,8 +6,12 @@ source listing while the variables update alongside it.
 ## Installation
 
 ```bash
-uv sync
+uv tool install visual-trace     # or: pipx install visual-trace
 ```
+
+That puts a `visual-trace` command on your `PATH`. To work on Visual Trace
+itself, clone the repo and run `uv sync` instead -- see
+[Contributing](#contributing).
 
 Manim ships its own rendering wheels, but shells out to **ffmpeg**, which you
 need on your `PATH`:
@@ -36,9 +40,11 @@ def main():
 ```
 
 ```bash
-uv run visual-trace examples/two_sum.py
-uv run visual-trace examples/two_sum.py --quality high_quality
+visual-trace two_sum.py
+visual-trace two_sum.py --quality high_quality
 ```
+
+From a clone, that is `uv run visual-trace examples/two_sum.py`.
 
 The video lands in `media/videos/`. The default is 854x480, which is fine as a
 smoke test but too small to read the code listing — use `--quality
@@ -130,9 +136,14 @@ the render rather than letting it show stale values.
 ## Contributing
 
 ```bash
+uv sync                                        # set up the clone
 uv run pytest tests/ -q                        # fast geometry checks
 uv run scripts/verify.py examples/two_sum.py   # full render + probe
 ```
+
+CI runs the tests on 3.12 and 3.13, builds the package, and renders an example
+under the probe -- `verify.py` exits non-zero if any invariant or the
+landmark-drift check fails, so a visual regression breaks the build.
 
 `verify.py` renders an example and reports per-step geometry assertions, a
 landmark-drift check and a captioned contact sheet in `media/verify/`, so a
