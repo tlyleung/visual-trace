@@ -130,11 +130,31 @@ def pick(frames: list[Path], count: int) -> list[Path]:
 ROIS = {"code": "West", "table": "East"}
 
 
+# ImageMagick resolves its default font through a registry -- on Debian that is
+# type-ghostscript.xml, so a box without ghostscript has *no* default and
+# -annotate fails with `unable to read font (null)`, however many font packages
+# are installed. Naming a file skips the registry entirely.
+FONTS = (
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+)
+
+
+def font_args() -> list[str]:
+    """`-font <file>`, or nothing if we cannot find one to name."""
+    override = os.environ.get("VISUAL_TRACE_FONT")
+    for path in (override, *FONTS):
+        if path and Path(path).exists():
+            return ["-font", path]
+    return []
+
+
 def caption(src: Path, dest: Path, text: str, tile_width: int, roi: str | None) -> None:
     crop = (
         ["-gravity", ROIS[roi], "-crop", "50%x100%+0+0", "+repage"] if roi else []
     )
-    sh("convert", src, *crop,
+    sh("convert", src, *crop, *font_args(),
        "-resize", f"{tile_width}x",
        "-background", "#101014", "-gravity", "North", "-splice", f"0x{CAPTION_BAR}",
        "-fill", "#f0f0f0", "-pointsize", "20", "-annotate", "+0+10", text,
