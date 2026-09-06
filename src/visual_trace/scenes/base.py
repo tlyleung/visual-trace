@@ -37,9 +37,6 @@ class Animation(mn.Scene):
         code_string = inspect.getsource(self.func)
         self.source_lines, self.start_line_number = inspect.getsourcelines(self.func)
 
-        # Transform code to use animated data structures
-        # code = transform_code(code)
-
         if not code_string:
             raise ValueError("Could not retrieve source code for the function.")
 
