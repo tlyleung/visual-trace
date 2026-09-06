@@ -3,6 +3,15 @@
 Render a Python function's execution as an animated video: a highlight walks the
 source listing while the variables update alongside it.
 
+![A traced run of two_sum: a highlight bar walks down the source listing on the
+left while a variables table on the right updates, with nums drawn as a row of
+cells and d as stacked key/value cells](docs/demo.gif)
+
+[`examples/two_sum.py`](examples/two_sum.py), rendered by `visual-trace
+two_sum.py`. Nothing in that file mentions this library -- `nums` is a plain
+list and `d` a plain `{}`; the cells, the lookups and the membership sweeps all
+fall out of the code's own data access.
+
 ## Installation
 
 ```bash
