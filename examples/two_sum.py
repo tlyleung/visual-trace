@@ -1,9 +1,5 @@
-from visual_trace.data_structures.dict import Dict
-from visual_trace.data_structures.list import List
-
-
-def two_sum(nums: List[int], target: int) -> List[int]:
-    d = Dict()
+def two_sum(nums: list[int], target: int) -> list[int]:
+    d = {}
 
     for i in range(len(nums)):
         num = nums[i]
@@ -15,7 +11,7 @@ def two_sum(nums: List[int], target: int) -> List[int]:
 
 
 def main():
-    args = (List(2, 7, 11, 15), 9)
+    args = ([2, 7, 11, 15], 9)
     func = two_sum
     return func, args
 

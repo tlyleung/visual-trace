@@ -1,7 +1,4 @@
-from visual_trace.data_structures.list import List
-
-
-def bubble_sort(nums: List[int]) -> List[int]:
+def bubble_sort(nums: list[int]) -> list[int]:
     for i in range(len(nums)):
         for j in range(len(nums) - i - 1):
             if nums[j] > nums[j + 1]:
@@ -10,7 +7,7 @@ def bubble_sort(nums: List[int]) -> List[int]:
 
 
 def main():
-    args = (List(4, 2, 5, 1),)
+    args = ([4, 2, 5, 1],)
     func = bubble_sort
     return func, args
 

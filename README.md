@@ -36,8 +36,8 @@ def main():
 ```
 
 ```bash
-uv run visual-trace examples/two_sum_plain.py
-uv run visual-trace examples/two_sum_plain.py --quality high_quality
+uv run visual-trace examples/two_sum.py
+uv run visual-trace examples/two_sum.py --quality high_quality
 ```
 
 The video lands in `media/videos/`. The default is 854x480, which is fine as a
@@ -55,8 +55,10 @@ The rewrite happens on the syntax tree and is compiled against your original
 file, so **the code panel shows exactly what you wrote**, not the rewrite, and
 line numbers line up.
 
-You can still use the containers directly if you prefer, and both examples in
-`examples/` do:
+You can still name the containers directly if you prefer. Importing them is
+not a conflict -- the rewrite seeds the same two objects into your module, so
+your import simply rebinds them, and your plain literals are still rewritten
+around it:
 
 ```python
 from visual_trace.data_structures.dict import Dict
@@ -65,7 +67,8 @@ from visual_trace.data_structures.list import List
 nums = List(2, 7, 11, 15)
 ```
 
-Pass `--no-rewrite` to have your `list` and `dict` taken literally.
+Nothing in `examples/` needs to, so none of them do. Pass `--no-rewrite` to have
+your `list` and `dict` taken literally instead.
 
 ### What the rewrite does not reach
 
@@ -98,7 +101,6 @@ the render rather than letting it show stale values.
 | Example | Shows |
 | ------- | ----- |
 | [`two_sum`](examples/two_sum.py) | dict lookups, membership sweeps |
-| [`two_sum_plain`](examples/two_sum_plain.py) | the same, written with plain `list`/`dict` |
 | [`max_sub_array`](examples/max_sub_array.py) | iterating a list |
 | [`bubble_sort`](examples/bubble_sort.py) | in-place swaps |
 | [`binary_search`](examples/binary_search.py) | indexed reads |

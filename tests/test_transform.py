@@ -13,6 +13,7 @@ import pytest
 
 from visual_trace.data_structures.dict import Dict
 from visual_trace.data_structures.list import List
+from visual_trace.utils.loader import load_script
 from visual_trace.utils.transform import rewrite
 
 
@@ -145,3 +146,34 @@ def test_the_original_source_is_what_gets_shown(tmp_path):
     assert "List(" not in inspect.getsource(namespace["f"])
     assert "[1, 2]" in inspect.getsource(namespace["f"])
     assert isinstance(namespace["f"](), List)
+
+
+def test_a_module_that_imports_the_containers_itself_is_undisturbed(tmp_path):
+    """An explicit import must rebind the seeded names, not fight them.
+
+    `List` and `Dict` are seeded into the exec globals rather than injected as
+    an import node, precisely so the rewrite adds no lines. A user who writes
+    the import themselves therefore gets back the same two objects, keeps their
+    own line numbers, and still has their plain literals rewritten around it.
+    `examples/two_sum.py` covered this incidentally until every example was
+    converted to plain containers.
+    """
+    path = tmp_path / "user.py"
+    path.write_text(
+        "from visual_trace.data_structures.dict import Dict\n"
+        "from visual_trace.data_structures.list import List\n"
+        "\n"
+        "\n"
+        "def f():\n"
+        "    return List(1, 2), Dict(a=1), [3], {'b': 2}\n"
+    )
+    module = load_script(path)
+
+    assert module.List is List, "the import bound a different List"
+    assert module.Dict is Dict, "the import bound a different Dict"
+    assert module.f.__code__.co_firstlineno == 5, "the rewrite moved the function"
+
+    written_list, written_dict, literal_list, literal_dict = module.f()
+    assert isinstance(written_list, List) and isinstance(written_dict, Dict)
+    assert isinstance(literal_list, List), "the import suppressed the rewrite"
+    assert isinstance(literal_dict, Dict), "the import suppressed the rewrite"

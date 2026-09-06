@@ -1,7 +1,4 @@
-from visual_trace.data_structures.dict import Dict
-
-
-def dict_operations(scores: Dict) -> int:
+def dict_operations(scores: dict) -> int:
     total = 0
     for value in scores.values():
         total += value
@@ -11,7 +8,7 @@ def dict_operations(scores: Dict) -> int:
 
 
 def main():
-    args = (Dict(a=5, b=5, c=9),)
+    args = ({"a": 5, "b": 5, "c": 9},)
     func = dict_operations
     return func, args
 

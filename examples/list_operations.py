@@ -1,7 +1,4 @@
-from visual_trace.data_structures.list import List
-
-
-def list_operations(nums: List[int]) -> int:
+def list_operations(nums: list[int]) -> int:
     test = 0
     nums.append(1)
     nums.append(2)
@@ -10,7 +7,7 @@ def list_operations(nums: List[int]) -> int:
 
 
 def main():
-    args = (List(-1, 0),)
+    args = ([-1, 0],)
     func = list_operations
     return func, args
 

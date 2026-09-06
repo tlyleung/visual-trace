@@ -1,7 +1,4 @@
-from visual_trace.data_structures.list import List
-
-
-def binary_search(nums: List[int], target: int) -> int:
+def binary_search(nums: list[int], target: int) -> int:
     low = 0
     high = len(nums) - 1
 
@@ -18,7 +15,7 @@ def binary_search(nums: List[int], target: int) -> int:
 
 
 def main():
-    args = (List(1, 3, 5, 7, 9, 11, 13), 11)
+    args = ([1, 3, 5, 7, 9, 11, 13], 11)
     func = binary_search
     return func, args
 
